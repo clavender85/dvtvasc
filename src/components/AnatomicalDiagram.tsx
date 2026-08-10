@@ -48,6 +48,101 @@ interface AnatomicalDiagramProps {
   comparisons?: Record<string, any>;
 }
 
+// Visual Specification for Venous Map Rendering (Colors, Patterns, Lumen Flow)
+export interface VesselVisualSpecs {
+  wallColor: string;
+  wallDashArray?: string;
+  wallWidth: number;
+  fillPatternUrl?: string;
+  fillColor?: string;
+  fillWidth: number;
+  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint';
+  lumenColor: string;
+  lumenWidth: number;
+  showQuestionMark?: boolean;
+  statusText: string;
+  opacity: number;
+}
+
+// Compact Swatch Renderer for Permanent Venous Map Legend
+const LegendSwatch: React.FC<{
+  title: string;
+  subtitle: string;
+  wallColor: string;
+  fillPatternUrl?: string;
+  fillColor?: string;
+  wallDashArray?: string;
+  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint';
+  lumenColor?: string;
+  showQuestionMark?: boolean;
+}> = ({
+  title,
+  subtitle,
+  wallColor,
+  fillPatternUrl,
+  fillColor,
+  wallDashArray,
+  lumenType,
+  lumenColor = '#22d3ee',
+  showQuestionMark
+}) => (
+  <div className="flex items-center gap-2.5 p-2 bg-slate-900/90 rounded-lg border border-slate-800/80 hover:border-slate-700 transition-colors">
+    <div className="w-14 h-8 bg-slate-950 rounded border border-slate-800 flex items-center justify-center flex-shrink-0 px-1 overflow-hidden">
+      <svg viewBox="0 0 50 20" className="w-full h-full">
+        {/* Outer Wall */}
+        <line
+          x1="2"
+          y1="10"
+          x2="48"
+          y2="10"
+          stroke={wallColor}
+          strokeWidth="12"
+          strokeDasharray={wallDashArray}
+          strokeLinecap="round"
+        />
+        {/* Fill / Thrombus Layer */}
+        {(fillPatternUrl || fillColor) && (
+          <line
+            x1="4"
+            y1="10"
+            x2="46"
+            y2="10"
+            stroke={fillPatternUrl || fillColor}
+            strokeWidth="9"
+            strokeLinecap="round"
+          />
+        )}
+        {/* Lumen / Flow Channel */}
+        {lumenType === 'full_flow' && (
+          <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="6" strokeLinecap="round" />
+        )}
+        {lumenType === 'narrow_channel' && (
+          <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="2.5" strokeLinecap="round" />
+        )}
+        {lumenType === 'wide_residual' && (
+          <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="5" strokeLinecap="round" />
+        )}
+        {lumenType === 'recanalised_multi' && (
+          <>
+            <line x1="5" y1="7" x2="45" y2="7" stroke={lumenColor} strokeWidth="1.8" strokeLinecap="round" />
+            <line x1="5" y1="13" x2="45" y2="13" stroke={lumenColor} strokeWidth="1.8" strokeLinecap="round" />
+          </>
+        )}
+        {showQuestionMark && (
+          <g transform="translate(25, 10)">
+            <circle r="5" fill="#d97706" stroke="#fef08a" strokeWidth="1" />
+            <text x="0" y="2" textAnchor="middle" fill="#ffffff" fontSize="7" fontWeight="bold">?</text>
+          </g>
+        )}
+      </svg>
+    </div>
+    <div className="flex-1 min-w-0">
+      <div className="font-bold text-[11px] text-slate-100 truncate">{title}</div>
+      <div className="text-[10px] text-slate-400 leading-tight truncate">{subtitle}</div>
+    </div>
+  </div>
+);
+
 // Fixed anatomical landmark Y-coordinates in SVG viewBox space (0 to 1050)
 const LANDMARK_Y = {
   IVC_TOP: 60,
@@ -342,104 +437,160 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     }
   };
 
-  // Vessel visual style generator (Thicker, bold anatomical rendering)
-  const getVesselVisuals = (id: string, category: VesselCategory) => {
+  // Vessel visual style generator (Thicker, bold anatomical rendering + Multi-Layer Pattern Coding)
+  const getVesselVisuals = (id: string, category: VesselCategory): VesselVisualSpecs => {
     const finding = vesselFindings[id];
     const isSelected = selectedVesselIds.includes(id);
     const isHovered = hoveredId === id;
     const baseWidth = getCategoryBaseWidth(category);
     const calculatedWidth = isSelected ? baseWidth + 5 : isHovered ? baseWidth + 3 : baseWidth;
 
-    if (!finding) {
+    if (!finding || finding.status === 'not_assessed') {
       return {
-        fill: '#1e293b',
-        stroke: '#475569',
-        strokeWidth: calculatedWidth * 0.7,
-        opacity: 0.5,
-        statusText: 'Not configured'
+        wallColor: '#334155',
+        wallDashArray: '5 4',
+        wallWidth: calculatedWidth * 0.75,
+        fillColor: 'transparent',
+        fillWidth: 0,
+        lumenType: 'none_faint',
+        lumenColor: 'transparent',
+        lumenWidth: 0,
+        statusText: 'Not Assessed',
+        opacity: 0.45
       };
     }
 
-    const { status, patency, chronicity } = finding;
-
-    if (status === 'not_assessed') {
+    if (finding.status === 'not_visualised') {
       return {
-        fill: '#0f172a',
-        stroke: '#334155',
-        strokeWidth: calculatedWidth * 0.75,
-        strokeDasharray: '5 4',
-        opacity: 0.45,
-        statusText: 'Not Assessed'
+        wallColor: '#64748b',
+        wallDashArray: '3 3',
+        wallWidth: calculatedWidth * 0.8,
+        fillColor: 'transparent',
+        fillWidth: 0,
+        lumenType: 'none_faint',
+        lumenColor: 'transparent',
+        lumenWidth: 0,
+        statusText: 'Not Visualised',
+        opacity: 0.7
       };
     }
 
-    if (status === 'not_visualised') {
+    if (finding.status === 'normal') {
+      const isSuperficial = category === 'superficial';
       return {
-        fill: '#1e1b4b',
-        stroke: '#d97706',
-        strokeWidth: calculatedWidth * 0.8,
-        strokeDasharray: '4 3',
-        opacity: 0.7,
-        statusText: 'Not Visualised'
+        wallColor: isSuperficial ? '#0284c7' : '#059669',
+        wallWidth: calculatedWidth,
+        fillColor: isSuperficial ? '#0284c7' : '#059669',
+        fillWidth: Math.max(2, calculatedWidth - 2),
+        lumenType: 'full_flow',
+        lumenColor: isSuperficial ? '#38bdf8' : '#34d399',
+        lumenWidth: Math.max(3, calculatedWidth - 4),
+        statusText: 'Normal Patent',
+        opacity: filterMode === 'abnormal_only' ? 0.3 : 0.95
       };
     }
 
-    if (status === 'abnormal') {
-      if (category === 'superficial') {
-        return {
-          fill: '#fef3c7',
-          stroke: '#d97706',
-          strokeWidth: calculatedWidth + 2,
-          opacity: 1,
-          statusText: 'Superficial Thrombus'
-        };
+    // Abnormal Status (Thrombus / Post-Thrombotic)
+    const isSuperficial = category === 'superficial';
+    const patency = finding.patency || 'completely_occluded';
+    const chronicity = finding.chronicity;
+
+    const isChronic = chronicity === 'chronic_post_thrombotic';
+    const isIndeterminate = chronicity === 'indeterminate' || patency === 'indeterminate';
+
+    let wallColor = '#dc2626'; // Deep DVT Red
+    let fillColor = '#be123c';
+    let fillPatternUrl: string | undefined = undefined;
+
+    if (isSuperficial) {
+      wallColor = '#ea580c'; // SVT Orange
+      fillColor = '#c2410c';
+    } else if (isChronic) {
+      wallColor = '#7e22ce'; // Purple
+      fillColor = '#6b21a8';
+    } else if (isIndeterminate) {
+      wallColor = '#d97706'; // Amber
+      fillColor = '#b45309';
+    }
+
+    let lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint' = 'none';
+    let lumenColor = '#22d3ee';
+    let lumenWidth = 0;
+    let wallDashArray: string | undefined = undefined;
+    let showQuestionMark = false;
+
+    if (isChronic) {
+      wallDashArray = '6 3';
+    }
+
+    if (isIndeterminate) {
+      fillPatternUrl = 'url(#crosshatch-amber)';
+      showQuestionMark = true;
+    }
+
+    if (patency === 'completely_occluded') {
+      lumenType = 'none';
+      lumenWidth = 0;
+      if (isSuperficial) {
+        fillColor = '#ea580c';
+      } else if (isChronic) {
+        fillColor = '#7e22ce';
+        fillPatternUrl = 'url(#hatch-purple)';
+      } else {
+        fillColor = '#be123c';
       }
-
-      if (patency === 'completely_occluded' || patency === 'mostly_occluded') {
-        return {
-          fill: '#fee2e2',
-          stroke: '#dc2626',
-          strokeWidth: calculatedWidth + 3,
-          opacity: 1,
-          statusText: 'Occlusive DVT'
-        };
+    } else if (patency === 'mostly_occluded') {
+      lumenType = 'narrow_channel';
+      lumenWidth = 2.5;
+      if (isSuperficial) {
+        fillColor = '#ea580c';
+      } else if (isChronic) {
+        fillPatternUrl = 'url(#hatch-purple)';
+      } else {
+        fillColor = '#be123c';
       }
-
-      if (chronicity === 'chronic_post_thrombotic' || patency === 'recanalised') {
-        return {
-          fill: '#f3e8ff',
-          stroke: '#9333ea',
-          strokeWidth: calculatedWidth + 2,
-          opacity: 1,
-          statusText: 'Chronic Post-Thrombotic'
-        };
+    } else if (patency === 'partially_occluded' || patency === 'patent') {
+      lumenType = 'wide_residual';
+      lumenWidth = Math.max(4, calculatedWidth - 6);
+      if (isSuperficial) {
+        fillPatternUrl = 'url(#hatch-orange)';
+      } else if (isChronic) {
+        fillPatternUrl = 'url(#hatch-purple)';
+      } else if (!isIndeterminate) {
+        fillPatternUrl = 'url(#hatch-red)';
       }
-
-      // Default abnormal / non-occlusive
-      return {
-        fill: '#ffedd5',
-        stroke: '#ea580c',
-        strokeWidth: calculatedWidth + 2,
-        opacity: 1,
-        statusText: 'Partial / Non-Occlusive DVT'
-      };
+    } else if (patency === 'recanalised') {
+      lumenType = 'recanalised_multi';
+      lumenWidth = 1.8;
+      lumenColor = '#22d3ee';
+      if (isSuperficial) {
+        fillPatternUrl = 'url(#hatch-orange)';
+      } else if (isChronic) {
+        fillPatternUrl = 'url(#hatch-purple)';
+      } else {
+        fillPatternUrl = 'url(#recanalised-pattern)';
+      }
     }
 
-    // Normal Patent Status
     return {
-      fill: category === 'superficial' ? '#e0f2fe' : '#dcfce7',
-      stroke: isHovered
-        ? '#15803d'
-        : isSelected
-        ? '#38bdf8'
-        : category === 'superficial'
-        ? '#0284c7'
-        : category === 'muscular_calf'
-        ? '#059669'
-        : '#16a34a',
-      strokeWidth: calculatedWidth,
-      opacity: filterMode === 'abnormal_only' ? 0.3 : 0.95,
-      statusText: 'Normal Patent'
+      wallColor,
+      wallDashArray,
+      wallWidth: calculatedWidth + 2,
+      fillPatternUrl,
+      fillColor,
+      fillWidth: calculatedWidth - 1,
+      lumenType,
+      lumenColor,
+      lumenWidth,
+      showQuestionMark,
+      statusText: isSuperficial
+        ? `Superficial Thrombus (${patency.replace(/_/g, ' ')})`
+        : isChronic
+        ? `Chronic Change (${patency.replace(/_/g, ' ')})`
+        : isIndeterminate
+        ? `Indeterminate DVT (${patency.replace(/_/g, ' ')})`
+        : `DVT (${patency.replace(/_/g, ' ')})`,
+      opacity: 1.0
     };
   };
 
@@ -456,11 +607,106 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     const finding = vesselFindings[id];
     const isSelected = selectedVesselIds.includes(id);
     const isHovered = hoveredId === id;
-    const visuals = getVesselVisuals(id, category);
+    const visualSpecs = getVesselVisuals(id, category);
 
     if (filterMode === 'abnormal_only' && finding?.status !== 'abnormal') {
       return null;
     }
+
+    const renderPathStack = (d: string, keySuffix: string = '') => (
+      <g key={`${id}_paths${keySuffix}`}>
+        {/* Glow halo when selected or hovered */}
+        {(isSelected || isHovered) && (
+          <path
+            d={d}
+            stroke={isSelected ? '#38bdf8' : '#60a5fa'}
+            strokeWidth={visualSpecs.wallWidth + 8}
+            strokeLinecap="round"
+            fill="none"
+            opacity={isSelected ? 0.65 : 0.4}
+            className="animate-pulse"
+          />
+        )}
+
+        {/* Layer 1: Outer Wall */}
+        <path
+          d={d}
+          stroke={isSelected ? '#38bdf8' : visualSpecs.wallColor}
+          strokeWidth={visualSpecs.wallWidth}
+          strokeDasharray={visualSpecs.wallDashArray}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          opacity={visualSpecs.opacity}
+        />
+
+        {/* Layer 2: Fill / Thrombus Pattern Layer */}
+        {(visualSpecs.fillPatternUrl || visualSpecs.fillColor) && (
+          <path
+            d={d}
+            stroke={visualSpecs.fillPatternUrl ? visualSpecs.fillPatternUrl : visualSpecs.fillColor}
+            strokeWidth={visualSpecs.fillWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            opacity={visualSpecs.opacity}
+          />
+        )}
+
+        {/* Layer 3: Internal Flow Lumen Representation */}
+        {visualSpecs.lumenType === 'full_flow' && (
+          <path
+            d={d}
+            stroke={visualSpecs.lumenColor}
+            strokeWidth={visualSpecs.lumenWidth}
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
+
+        {visualSpecs.lumenType === 'narrow_channel' && (
+          <path
+            d={d}
+            stroke={visualSpecs.lumenColor}
+            strokeWidth={visualSpecs.lumenWidth}
+            strokeLinecap="round"
+            fill="none"
+            className="animate-pulse"
+          />
+        )}
+
+        {visualSpecs.lumenType === 'wide_residual' && (
+          <path
+            d={d}
+            stroke={visualSpecs.lumenColor}
+            strokeWidth={visualSpecs.lumenWidth}
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
+
+        {visualSpecs.lumenType === 'recanalised_multi' && (
+          <>
+            <path
+              d={d}
+              stroke={visualSpecs.lumenColor}
+              strokeWidth={1.8}
+              strokeDasharray="8 4"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d={d}
+              stroke="#67e8f9"
+              strokeWidth={1.2}
+              strokeDasharray="4 8"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </>
+        )}
+      </g>
+    );
 
     return (
       <g
@@ -481,7 +727,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         <path
           d={pathD}
           stroke="transparent"
-          strokeWidth={Math.max(34, visuals.strokeWidth + 18)}
+          strokeWidth={Math.max(34, visualSpecs.wallWidth + 18)}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
@@ -491,7 +737,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           <path
             d={pairedPathD2}
             stroke="transparent"
-            strokeWidth={Math.max(34, visuals.strokeWidth + 18)}
+            strokeWidth={Math.max(34, visualSpecs.wallWidth + 18)}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -499,100 +745,20 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           />
         )}
 
-        {/* Glow halo when selected or hovered */}
-        {(isSelected || isHovered) && (
-          <>
-            <path
-              d={pathD}
-              stroke={isSelected ? '#38bdf8' : '#60a5fa'}
-              strokeWidth={visuals.strokeWidth + 10}
-              strokeLinecap="round"
-              fill="none"
-              opacity={isSelected ? 0.65 : 0.4}
-              className="animate-pulse"
-            />
-            {isPaired && pairedPathD2 && (
-              <path
-                d={pairedPathD2}
-                stroke={isSelected ? '#38bdf8' : '#60a5fa'}
-                strokeWidth={visuals.strokeWidth + 10}
-                strokeLinecap="round"
-                fill="none"
-                opacity={isSelected ? 0.65 : 0.4}
-                className="animate-pulse"
-              />
-            )}
-          </>
-        )}
+        {/* Primary and Paired Vessel Path Stacks */}
+        {renderPathStack(pathD, '_p1')}
+        {isPaired && pairedPathD2 && renderPathStack(pairedPathD2, '_p2')}
 
-        {/* Primary Vessel Path */}
-        <path
-          d={pathD}
-          stroke={isSelected ? '#38bdf8' : visuals.stroke}
-          strokeWidth={visuals.strokeWidth}
-          strokeDasharray={visuals.strokeDasharray}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-          opacity={visuals.opacity}
-        />
-
-        {/* Paired Vessel Companion Path */}
-        {isPaired && pairedPathD2 && (
-          <path
-            d={pairedPathD2}
-            stroke={isSelected ? '#38bdf8' : visuals.stroke}
-            strokeWidth={visuals.strokeWidth}
-            strokeDasharray={visuals.strokeDasharray}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-            opacity={visuals.opacity}
-          />
-        )}
-
-        {/* Thrombus Overlay (if abnormal) */}
-        {finding?.status === 'abnormal' && (
-          <>
-            <path
-              d={pathD}
-              stroke={
-                finding.patency === 'completely_occluded' || finding.patency === 'mostly_occluded'
-                  ? '#be123c'
-                  : finding.chronicity === 'chronic_post_thrombotic'
-                  ? '#7e22ce'
-                  : '#d97706'
-              }
-              strokeWidth={visuals.strokeWidth + 3}
-              strokeDasharray={
-                finding.chronicity === 'chronic_post_thrombotic' ? '4 3' : undefined
-              }
-              strokeLinecap="round"
-              fill="none"
-            />
-            {isPaired && pairedPathD2 && (
-              <path
-                d={pairedPathD2}
-                stroke={
-                  finding.patency === 'completely_occluded' || finding.patency === 'mostly_occluded'
-                    ? '#be123c'
-                    : finding.chronicity === 'chronic_post_thrombotic'
-                    ? '#7e22ce'
-                    : '#d97706'
-                }
-                strokeWidth={visuals.strokeWidth + 3}
-                strokeDasharray={
-                  finding.chronicity === 'chronic_post_thrombotic' ? '4 3' : undefined
-                }
-                strokeLinecap="round"
-                fill="none"
-              />
-            )}
-          </>
+        {/* Question Mark Badge for Indeterminate Age */}
+        {visualSpecs.showQuestionMark && labelPos && (
+          <g transform={`translate(${labelPos.x}, ${labelPos.y - 18})`}>
+            <circle r="9" fill="#d97706" stroke="#fef08a" strokeWidth="1.5" className="shadow-lg" />
+            <text x="0" y="3.5" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">?</text>
+          </g>
         )}
 
         {/* Multi-Selection Checkmark Badge on SVG */}
-        {isSelected && labelPos && (
+        {isSelected && labelPos && !visualSpecs.showQuestionMark && (
           <g transform={`translate(${labelPos.x}, ${labelPos.y - 14})`}>
             <circle
               r="7"
@@ -612,29 +778,29 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           </g>
         )}
 
-        {/* Landmark Text Tag for Extents - Shown if text labels enabled or hovered */}
+        {/* Landmark Text Tag for Extents */}
         {finding?.status === 'abnormal' && labelPos && (showTextLabels || isHovered) && (
           <g transform={`translate(${labelPos.x}, ${labelPos.y})`}>
             {(() => {
               const { proxText, distText } = formatExtentLabel(finding);
-              const tagText = proxText || distText || 'Thrombus documented';
+              const tagText = proxText || distText || visualSpecs.statusText;
               return (
                 <g className="no-print">
                   <rect
-                    x={labelPos.textAnchor === 'end' ? -125 : -5}
+                    x={labelPos.textAnchor === 'end' ? -135 : -5}
                     y="-12"
-                    width="130"
+                    width="140"
                     height="18"
                     rx="4"
-                    fill="#1e1b4b"
-                    stroke="#dc2626"
+                    fill="#0f172a"
+                    stroke={visualSpecs.wallColor}
                     strokeWidth="1"
                   />
                   <text
                     x={labelPos.textAnchor === 'end' ? -10 : 5}
                     y="0"
                     textAnchor={labelPos.textAnchor || 'start'}
-                    fill="#fca5a5"
+                    fill="#f87171"
                     fontSize="9"
                     fontWeight="bold"
                   >
@@ -646,7 +812,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           </g>
         )}
 
-        {/* Anatomical Text Descriptor - Hidden by default for clean graphical diagram, shown on hover or when toggled ON */}
+        {/* Anatomical Text Descriptor */}
         {labelPos && finding?.status !== 'abnormal' && (showTextLabels || isHovered) && (
           <g transform={`translate(${labelPos.x}, ${labelPos.y})`}>
             <rect
@@ -1114,45 +1280,71 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         </div>
       )}
 
-      {/* Main Interactive SVG Canvas Container */}
-      <div className="relative flex-1 min-h-[680px] bg-slate-950/90 rounded-xl border border-slate-800 p-2 flex justify-center items-center overflow-auto shadow-inner">
-        {/* Anatomical Direction Indicators */}
-        <div className="absolute top-3 left-4 flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-          <ArrowUp className="w-3.5 h-3.5 text-teal-400" /> PROXIMAL (PROX)
-        </div>
-        <div className="absolute bottom-3 left-4 flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-          <ArrowDown className="w-3.5 h-3.5 text-teal-400" /> DISTAL (DIST)
-        </div>
+      {/* Main Interactive Map & Permanent Compact Legend Container */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start flex-1 min-h-[680px]">
+        {/* SVG Canvas Container (3 cols on lg screens) */}
+        <div className="lg:col-span-3 relative h-full min-h-[680px] bg-slate-950/90 rounded-xl border border-slate-800 p-2 flex justify-center items-center overflow-auto shadow-inner">
+          {/* Anatomical Direction Indicators */}
+          <div className="absolute top-3 left-4 flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <ArrowUp className="w-3.5 h-3.5 text-teal-400" /> PROXIMAL (PROX)
+          </div>
+          <div className="absolute bottom-3 left-4 flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <ArrowDown className="w-3.5 h-3.5 text-teal-400" /> DISTAL (DIST)
+          </div>
 
-        {/* Limb Orientation Headers */}
-        <div className="absolute top-3 left-1/4 -translate-x-1/2 bg-teal-950/80 border border-teal-800 text-teal-300 px-3 py-1 rounded-full text-xs font-bold shadow-md">
-          RIGHT LOWER LIMB
-        </div>
-        <div className="absolute top-3 right-1/4 translate-x-1/2 bg-sky-950/80 border border-sky-800 text-sky-300 px-3 py-1 rounded-full text-xs font-bold shadow-md">
-          LEFT LOWER LIMB
-        </div>
+          {/* Limb Orientation Headers */}
+          <div className="absolute top-3 left-1/4 -translate-x-1/2 bg-teal-950/80 border border-teal-800 text-teal-300 px-3 py-1 rounded-full text-xs font-bold shadow-md">
+            RIGHT LOWER LIMB
+          </div>
+          <div className="absolute top-3 right-1/4 translate-x-1/2 bg-sky-950/80 border border-sky-800 text-sky-300 px-3 py-1 rounded-full text-xs font-bold shadow-md">
+            LEFT LOWER LIMB
+          </div>
 
-        {/* SVG Map Canvas */}
-        <div
-          className="w-full h-full flex justify-center transition-transform duration-200"
-          style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-        >
-          <svg
-            viewBox="0 0 900 1020"
-            className="w-full h-full max-h-[950px]"
-            preserveAspectRatio="xMidYMid meet"
+          {/* SVG Map Canvas */}
+          <div
+            className="w-full h-full flex justify-center transition-transform duration-200"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
           >
-            <defs>
-              <pattern
-                id="chronic-pattern"
-                width="10"
-                height="10"
-                patternTransform="rotate(45)"
-                patternUnits="userSpaceOnUse"
-              >
-                <line x1="0" y1="0" x2="0" y2="10" stroke="#9333ea" strokeWidth="4" />
-              </pattern>
-            </defs>
+            <svg
+              viewBox="0 0 900 1020"
+              className="w-full h-full max-h-[950px]"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                {/* Red Diagonal Hatching for Partially Occluded DVT */}
+                <pattern id="hatch-red" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#fee2e2" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#dc2626" strokeWidth="3" />
+                  <line x1="4" y1="0" x2="4" y2="8" stroke="#ef4444" strokeWidth="2" />
+                </pattern>
+
+                {/* Orange Diagonal Hatching for Superficial Thrombus */}
+                <pattern id="hatch-orange" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#ffedd5" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#ea580c" strokeWidth="3" />
+                  <line x1="4" y1="0" x2="4" y2="8" stroke="#f97316" strokeWidth="2" />
+                </pattern>
+
+                {/* Purple Diagonal Hatching for Chronic Post-Thrombotic */}
+                <pattern id="hatch-purple" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#f3e8ff" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#7e22ce" strokeWidth="3" />
+                  <line x1="4" y1="0" x2="4" y2="8" stroke="#a855f7" strokeWidth="2" />
+                </pattern>
+
+                {/* Amber Cross-Hatched Grid for Indeterminate Age */}
+                <pattern id="crosshatch-amber" width="8" height="8" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#fef3c7" />
+                  <path d="M0,4 L8,4 M4,0 L4,8" stroke="#d97706" strokeWidth="2" />
+                </pattern>
+
+                {/* Recanalised Thrombus Pattern (Red/Purple with Channels) */}
+                <pattern id="recanalised-pattern" width="10" height="10" patternTransform="rotate(30)" patternUnits="userSpaceOnUse">
+                  <rect width="10" height="10" fill="#991b1b" />
+                  <line x1="2" y1="0" x2="2" y2="10" stroke="#06b6d4" strokeWidth="1.5" />
+                  <line x1="7" y1="0" x2="7" y2="10" stroke="#06b6d4" strokeWidth="1.5" />
+                </pattern>
+              </defs>
 
             {/* ANATOMICAL LANDMARK GUIDELINE ANNOTATIONS */}
             {showLandmarks && (
@@ -1719,6 +1911,100 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           </svg>
         </div>
       </div>
+
+      {/* Permanent Compact Legend Sidebar (1 col on lg screens) */}
+      <div className="lg:col-span-1 bg-slate-950/95 border border-slate-800 rounded-xl p-3 text-xs space-y-2 font-sans self-stretch overflow-y-auto max-h-[750px] shadow-xl">
+        <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800">
+          <Info className="w-4 h-4 text-teal-400 flex-shrink-0" />
+          <div>
+            <h4 className="font-bold text-slate-100 text-xs uppercase tracking-wider">Venous Map Legend</h4>
+            <p className="text-[10px] text-slate-400">Color = Category • Pattern = Lumen State</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <LegendSwatch
+            title="Normal Patent Vein"
+            subtitle="Green/teal, thin solid vessel, clear flow"
+            wallColor="#059669"
+            fillColor="#059669"
+            lumenType="full_flow"
+            lumenColor="#34d399"
+          />
+          <LegendSwatch
+            title="Completely Occluded DVT"
+            subtitle="Thick solid red, 100% occluded (no lumen)"
+            wallColor="#dc2626"
+            fillColor="#be123c"
+            lumenType="none"
+          />
+          <LegendSwatch
+            title="Mostly Occluded DVT"
+            subtitle="Red segment, narrow central flow channel"
+            wallColor="#dc2626"
+            fillColor="#be123c"
+            lumenType="narrow_channel"
+            lumenColor="#22d3ee"
+          />
+          <LegendSwatch
+            title="Partially Occluded DVT"
+            subtitle="Diagonal red hatching, wide residual lumen"
+            wallColor="#dc2626"
+            fillPatternUrl="url(#hatch-red)"
+            lumenType="wide_residual"
+            lumenColor="#22d3ee"
+          />
+          <LegendSwatch
+            title="Recanalised Thrombus"
+            subtitle="Red/purple segment, multi-channel flow lines"
+            wallColor="#be123c"
+            fillPatternUrl="url(#recanalised-pattern)"
+            lumenType="recanalised_multi"
+            lumenColor="#22d3ee"
+          />
+          <LegendSwatch
+            title="Chronic Post-Thrombotic"
+            subtitle="Purple/grey, dashed border, hatched fill"
+            wallColor="#7e22ce"
+            wallDashArray="6 3"
+            fillPatternUrl="url(#hatch-purple)"
+            lumenType="wide_residual"
+            lumenColor="#22d3ee"
+          />
+          <LegendSwatch
+            title="Indeterminate Age"
+            subtitle="Amber cross-hatched pattern with ? marker"
+            wallColor="#d97706"
+            wallDashArray="4 2"
+            fillPatternUrl="url(#crosshatch-amber)"
+            lumenType="wide_residual"
+            showQuestionMark={true}
+          />
+          <LegendSwatch
+            title="Superficial Thrombus (SVT)"
+            subtitle="Orange patterned vessel, distinct from DVT"
+            wallColor="#ea580c"
+            fillPatternUrl="url(#hatch-orange)"
+            lumenType="wide_residual"
+            lumenColor="#22d3ee"
+          />
+          <LegendSwatch
+            title="Not Visualised"
+            subtitle="Grey dotted vessel"
+            wallColor="#64748b"
+            wallDashArray="3 3"
+            lumenType="none_faint"
+          />
+          <LegendSwatch
+            title="Not Assessed"
+            subtitle="Very faint neutral outline"
+            wallColor="#334155"
+            wallDashArray="5 4"
+            lumenType="none_faint"
+          />
+        </div>
+      </div>
+    </div>
 
       {/* Hover Inspection Popover Panel */}
       {hoveredFinding && (
