@@ -56,7 +56,7 @@ export interface VesselVisualSpecs {
   fillPatternUrl?: string;
   fillColor?: string;
   fillWidth: number;
-  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint';
+  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'synechiae_strands' | 'none_faint';
   lumenColor: string;
   lumenWidth: number;
   showQuestionMark?: boolean;
@@ -72,7 +72,7 @@ const LegendSwatch: React.FC<{
   fillPatternUrl?: string;
   fillColor?: string;
   wallDashArray?: string;
-  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint';
+  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'synechiae_strands' | 'none_faint';
   lumenColor?: string;
   showQuestionMark?: boolean;
 }> = ({
@@ -126,6 +126,12 @@ const LegendSwatch: React.FC<{
           <>
             <line x1="5" y1="7" x2="45" y2="7" stroke={lumenColor} strokeWidth="1.8" strokeLinecap="round" />
             <line x1="5" y1="13" x2="45" y2="13" stroke={lumenColor} strokeWidth="1.8" strokeLinecap="round" />
+          </>
+        )}
+        {lumenType === 'synechiae_strands' && (
+          <>
+            <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="5" strokeLinecap="round" />
+            <line x1="5" y1="10" x2="45" y2="10" stroke="#f59e0b" strokeWidth="1.8" strokeDasharray="2 3" strokeLinecap="round" />
           </>
         )}
         {showQuestionMark && (
@@ -491,36 +497,30 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     }
 
     // Abnormal Status (Thrombus / Post-Thrombotic)
+    // ALL THROMBUS STATES USE ONE SINGLE UNIFIED AMBER / GOLD COLOUR PALETTE
     const isSuperficial = category === 'superficial';
     const patency = finding.patency || 'completely_occluded';
     const chronicity = finding.chronicity;
+    const hasSynechiae = finding.morphology?.includes('synechiae_webs') || finding.thrombusPresence === 'synechiae_webs';
+    const isRecanalised = patency === 'recanalised' || finding.morphology?.includes('recanalisation');
 
     const isChronic = chronicity === 'chronic_post_thrombotic';
     const isIndeterminate = chronicity === 'indeterminate' || patency === 'indeterminate';
 
-    let wallColor = '#dc2626'; // Deep DVT Red
-    let fillColor = '#be123c';
+    // Single consistent Amber/Gold base for all thrombus
+    const wallColor = '#d97706'; // Amber-600
+    let fillColor = '#b45309'; // Amber-700
     let fillPatternUrl: string | undefined = undefined;
-
-    if (isSuperficial) {
-      wallColor = '#ea580c'; // SVT Orange
-      fillColor = '#c2410c';
-    } else if (isChronic) {
-      wallColor = '#7e22ce'; // Purple
-      fillColor = '#6b21a8';
-    } else if (isIndeterminate) {
-      wallColor = '#d97706'; // Amber
-      fillColor = '#b45309';
-    }
-
-    let lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'none_faint' = 'none';
-    let lumenColor = '#22d3ee';
-    let lumenWidth = 0;
     let wallDashArray: string | undefined = undefined;
     let showQuestionMark = false;
 
+    let lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'synechiae_strands' | 'none_faint' = 'none';
+    let lumenColor = '#22d3ee'; // Cyan lumen flow
+    let lumenWidth = 0;
+
     if (isChronic) {
       wallDashArray = '6 3';
+      fillPatternUrl = 'url(#hatch-amber-light)';
     }
 
     if (isIndeterminate) {
@@ -528,49 +528,41 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       showQuestionMark = true;
     }
 
-    if (patency === 'completely_occluded') {
-      lumenType = 'none';
-      lumenWidth = 0;
-      if (isSuperficial) {
-        fillColor = '#ea580c';
-      } else if (isChronic) {
-        fillColor = '#7e22ce';
-        fillPatternUrl = 'url(#hatch-purple)';
-      } else {
-        fillColor = '#be123c';
-      }
-    } else if (patency === 'mostly_occluded') {
-      lumenType = 'narrow_channel';
-      lumenWidth = 2.5;
-      if (isSuperficial) {
-        fillColor = '#ea580c';
-      } else if (isChronic) {
-        fillPatternUrl = 'url(#hatch-purple)';
-      } else {
-        fillColor = '#be123c';
-      }
-    } else if (patency === 'partially_occluded' || patency === 'patent') {
-      lumenType = 'wide_residual';
-      lumenWidth = Math.max(4, calculatedWidth - 6);
-      if (isSuperficial) {
-        fillPatternUrl = 'url(#hatch-orange)';
-      } else if (isChronic) {
-        fillPatternUrl = 'url(#hatch-purple)';
-      } else if (!isIndeterminate) {
-        fillPatternUrl = 'url(#hatch-red)';
-      }
-    } else if (patency === 'recanalised') {
+    if (hasSynechiae && patency !== 'completely_occluded') {
+      lumenType = 'synechiae_strands';
+      lumenWidth = Math.max(4, calculatedWidth - 4);
+      if (!fillPatternUrl) fillPatternUrl = 'url(#hatch-amber)';
+    } else if (isRecanalised) {
       lumenType = 'recanalised_multi';
       lumenWidth = 1.8;
       lumenColor = '#22d3ee';
-      if (isSuperficial) {
-        fillPatternUrl = 'url(#hatch-orange)';
-      } else if (isChronic) {
-        fillPatternUrl = 'url(#hatch-purple)';
-      } else {
-        fillPatternUrl = 'url(#recanalised-pattern)';
+      fillPatternUrl = 'url(#recanalised-amber)';
+    } else if (patency === 'completely_occluded') {
+      lumenType = 'none';
+      lumenWidth = 0;
+      fillColor = '#d97706'; // Solid Amber Fill
+    } else if (patency === 'mostly_occluded') {
+      lumenType = 'narrow_channel';
+      lumenWidth = 2.5;
+      fillColor = '#b45309';
+    } else if (patency === 'partially_occluded' || patency === 'patent') {
+      lumenType = 'wide_residual';
+      lumenWidth = Math.max(4, calculatedWidth - 5);
+      if (!fillPatternUrl) fillPatternUrl = 'url(#hatch-amber)';
+    }
+
+    if (isSuperficial) {
+      if (!wallDashArray && patency !== 'completely_occluded') {
+        wallDashArray = '8 2';
       }
     }
+
+    let statusText = 'DVT';
+    if (isSuperficial) statusText = `Superficial Thrombosis (${patency.replace(/_/g, ' ')})`;
+    else if (hasSynechiae) statusText = `Synechiae / Webs (${patency.replace(/_/g, ' ')})`;
+    else if (isChronic) statusText = `Chronic Post-Thrombotic (${patency.replace(/_/g, ' ')})`;
+    else if (isIndeterminate) statusText = `Indeterminate DVT (${patency.replace(/_/g, ' ')})`;
+    else statusText = `DVT (${patency.replace(/_/g, ' ')})`;
 
     return {
       wallColor,
@@ -583,13 +575,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       lumenColor,
       lumenWidth,
       showQuestionMark,
-      statusText: isSuperficial
-        ? `Superficial Thrombus (${patency.replace(/_/g, ' ')})`
-        : isChronic
-        ? `Chronic Change (${patency.replace(/_/g, ' ')})`
-        : isIndeterminate
-        ? `Indeterminate DVT (${patency.replace(/_/g, ' ')})`
-        : `DVT (${patency.replace(/_/g, ' ')})`,
+      statusText,
       opacity: 1.0
     };
   };
@@ -700,6 +686,34 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               stroke="#67e8f9"
               strokeWidth={1.2}
               strokeDasharray="4 8"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </>
+        )}
+
+        {visualSpecs.lumenType === 'synechiae_strands' && (
+          <>
+            <path
+              d={d}
+              stroke={visualSpecs.lumenColor}
+              strokeWidth={visualSpecs.lumenWidth}
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d={d}
+              stroke="#f59e0b"
+              strokeWidth={1.8}
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d={d}
+              stroke="#d97706"
+              strokeWidth={1.2}
+              strokeDasharray="1 5"
               strokeLinecap="round"
               fill="none"
             />
@@ -1311,38 +1325,31 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               preserveAspectRatio="xMidYMid meet"
             >
               <defs>
-                {/* Red Diagonal Hatching for Partially Occluded DVT */}
-                <pattern id="hatch-red" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                  <rect width="8" height="8" fill="#fee2e2" />
-                  <line x1="0" y1="0" x2="0" y2="8" stroke="#dc2626" strokeWidth="3" />
-                  <line x1="4" y1="0" x2="4" y2="8" stroke="#ef4444" strokeWidth="2" />
+                {/* Amber Diagonal Hatching for Partially Occluded DVT / Mural Thrombus */}
+                <pattern id="hatch-amber" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#451a03" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#d97706" strokeWidth="3" />
+                  <line x1="4" y1="0" x2="4" y2="8" stroke="#f59e0b" strokeWidth="2" />
                 </pattern>
 
-                {/* Orange Diagonal Hatching for Superficial Thrombus */}
-                <pattern id="hatch-orange" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                  <rect width="8" height="8" fill="#ffedd5" />
-                  <line x1="0" y1="0" x2="0" y2="8" stroke="#ea580c" strokeWidth="3" />
-                  <line x1="4" y1="0" x2="4" y2="8" stroke="#f97316" strokeWidth="2" />
-                </pattern>
-
-                {/* Purple Diagonal Hatching for Chronic Post-Thrombotic */}
-                <pattern id="hatch-purple" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                  <rect width="8" height="8" fill="#f3e8ff" />
-                  <line x1="0" y1="0" x2="0" y2="8" stroke="#7e22ce" strokeWidth="3" />
-                  <line x1="4" y1="0" x2="4" y2="8" stroke="#a855f7" strokeWidth="2" />
+                {/* Muted Amber Hatching for Chronic Post-Thrombotic Change */}
+                <pattern id="hatch-amber-light" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                  <rect width="8" height="8" fill="#1e1b4b" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke="#b45309" strokeWidth="2" strokeDasharray="3 2" />
+                  <line x1="4" y1="0" x2="4" y2="8" stroke="#d97706" strokeWidth="1.5" strokeDasharray="2 2" />
                 </pattern>
 
                 {/* Amber Cross-Hatched Grid for Indeterminate Age */}
                 <pattern id="crosshatch-amber" width="8" height="8" patternUnits="userSpaceOnUse">
-                  <rect width="8" height="8" fill="#fef3c7" />
+                  <rect width="8" height="8" fill="#292524" />
                   <path d="M0,4 L8,4 M4,0 L4,8" stroke="#d97706" strokeWidth="2" />
                 </pattern>
 
-                {/* Recanalised Thrombus Pattern (Red/Purple with Channels) */}
-                <pattern id="recanalised-pattern" width="10" height="10" patternTransform="rotate(30)" patternUnits="userSpaceOnUse">
-                  <rect width="10" height="10" fill="#991b1b" />
-                  <line x1="2" y1="0" x2="2" y2="10" stroke="#06b6d4" strokeWidth="1.5" />
-                  <line x1="7" y1="0" x2="7" y2="10" stroke="#06b6d4" strokeWidth="1.5" />
+                {/* Recanalised Thrombus Pattern (Amber Matrix with Cyan Flow Channels) */}
+                <pattern id="recanalised-amber" width="10" height="10" patternTransform="rotate(30)" patternUnits="userSpaceOnUse">
+                  <rect width="10" height="10" fill="#78350f" />
+                  <line x1="2" y1="0" x2="2" y2="10" stroke="#06b6d4" strokeWidth="1.8" />
+                  <line x1="7" y1="0" x2="7" y2="10" stroke="#22d3ee" strokeWidth="1.8" />
                 </pattern>
               </defs>
 
@@ -1932,59 +1939,59 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             lumenColor="#34d399"
           />
           <LegendSwatch
-            title="Completely Occluded DVT"
-            subtitle="Thick solid red, 100% occluded (no lumen)"
-            wallColor="#dc2626"
-            fillColor="#be123c"
+            title="Occlusive DVT"
+            subtitle="Thick solid amber, 100% occluded (no lumen)"
+            wallColor="#d97706"
+            fillColor="#d97706"
             lumenType="none"
           />
           <LegendSwatch
-            title="Mostly Occluded DVT"
-            subtitle="Red segment, narrow central flow channel"
-            wallColor="#dc2626"
-            fillColor="#be123c"
+            title="Mostly Occlusive DVT"
+            subtitle="Amber vessel, narrow central flow channel"
+            wallColor="#d97706"
+            fillColor="#b45309"
             lumenType="narrow_channel"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Partially Occluded DVT"
-            subtitle="Diagonal red hatching, wide residual lumen"
-            wallColor="#dc2626"
-            fillPatternUrl="url(#hatch-red)"
+            title="Partially / Non-Occlusive DVT"
+            subtitle="Amber mural fill & wide patent lumen"
+            wallColor="#d97706"
+            fillPatternUrl="url(#hatch-amber)"
             lumenType="wide_residual"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
             title="Recanalised Thrombus"
-            subtitle="Red/purple segment, multi-channel flow lines"
-            wallColor="#be123c"
-            fillPatternUrl="url(#recanalised-pattern)"
+            subtitle="Amber vessel, multiple flow channel lines"
+            wallColor="#d97706"
+            fillPatternUrl="url(#recanalised-amber)"
             lumenType="recanalised_multi"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
             title="Chronic Post-Thrombotic"
-            subtitle="Purple/grey, dashed border, hatched fill"
-            wallColor="#7e22ce"
+            subtitle="Amber vessel, dashed border, light hatch"
+            wallColor="#d97706"
             wallDashArray="6 3"
-            fillPatternUrl="url(#hatch-purple)"
+            fillPatternUrl="url(#hatch-amber-light)"
             lumenType="wide_residual"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Indeterminate Age"
-            subtitle="Amber cross-hatched pattern with ? marker"
+            title="Synechiae / Webs / Strands"
+            subtitle="Patent lumen with dotted intraluminal strands"
             wallColor="#d97706"
-            wallDashArray="4 2"
-            fillPatternUrl="url(#crosshatch-amber)"
-            lumenType="wide_residual"
-            showQuestionMark={true}
+            fillPatternUrl="url(#hatch-amber)"
+            lumenType="synechiae_strands"
+            lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Superficial Thrombus (SVT)"
-            subtitle="Orange patterned vessel, distinct from DVT"
-            wallColor="#ea580c"
-            fillPatternUrl="url(#hatch-orange)"
+            title="Superficial Thrombosis"
+            subtitle="Amber superficial vessel with distinct border"
+            wallColor="#d97706"
+            wallDashArray="8 2"
+            fillPatternUrl="url(#hatch-amber)"
             lumenType="wide_residual"
             lumenColor="#22d3ee"
           />
