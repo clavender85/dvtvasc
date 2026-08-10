@@ -213,7 +213,7 @@ export const DEMO_CASE_3_FOLLOWUP_RECANALISED: ExamState = {
       thrombusPresence: 'residual_post_thrombotic',
       compressibility: 'partially_compressible',
       patency: 'recanalised',
-      echogenicity: 'intermediate_echogenicity',
+      echogenicity: 'mixed_echogenicity',
       morphology: ['recanalisation', 'wall_thickening', 'synechiae_webs'],
       chronicity: 'chronic_post_thrombotic',
       proximalExtent: {

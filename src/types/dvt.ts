@@ -49,7 +49,6 @@ export type ThrombusEchogenicity =
   | 'anechoic_hypoechoic'
   | 'hypoechoic'
   | 'mixed_echogenicity'
-  | 'intermediate_echogenicity'
   | 'echogenic'
   | 'highly_echogenic'
   | 'calcified'

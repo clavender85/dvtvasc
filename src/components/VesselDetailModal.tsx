@@ -167,7 +167,6 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
                     <option value="anechoic_hypoechoic">Anechoic / Very Hypoechoic</option>
                     <option value="hypoechoic">Hypoechoic</option>
                     <option value="mixed_echogenicity">Mixed Echogenicity</option>
-                    <option value="intermediate_echogenicity">Intermediate Echogenicity</option>
                     <option value="echogenic">Echogenic</option>
                     <option value="highly_echogenic">Highly Echogenic</option>
                     <option value="calcified">Calcified</option>
