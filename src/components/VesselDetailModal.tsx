@@ -1,0 +1,436 @@
+// Detailed Vessel Abnormality Card & Editor Modal
+
+import React from 'react';
+import { VesselFinding, Compressibility, Patency, ThrombusEchogenicity, SonographicChronicity, MorphologyOption, Landmark } from '../types/dvt';
+import { LANDMARK_LABELS } from '../data/anatomyData';
+import { X, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
+
+interface VesselDetailModalProps {
+  finding: VesselFinding | null;
+  onClose: () => void;
+  onSaveFinding: (updatedFinding: VesselFinding) => void;
+}
+
+const MORPHOLOGY_ITEMS: Array<{ id: MorphologyOption; label: string }> = [
+  { id: 'vein_expanded', label: 'Vein Expanded / Dilated' },
+  { id: 'normal_calibre', label: 'Normal Vein Calibre' },
+  { id: 'vein_contracted', label: 'Vein Contracted / Small' },
+  { id: 'adherent_to_wall', label: 'Adherent to Vessel Wall' },
+  { id: 'mobile_component', label: 'Mobile Component' },
+  { id: 'free_floating', label: 'Free-Floating Thrombus Tail' },
+  { id: 'synechiae_webs', label: 'Intraluminal Synechiae / Webs' },
+  { id: 'recanalisation', label: 'Channel Recanalisation Present' },
+  { id: 'collateralisation', label: 'Collateral Vein Flow' },
+  { id: 'wall_thickening', label: 'Venous Wall Thickening' },
+  { id: 'calcification', label: 'Intraluminal Calcification' }
+];
+
+export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
+  finding,
+  onClose,
+  onSaveFinding
+}) => {
+  if (!finding) return null;
+
+  const handleMorphologyToggle = (opt: MorphologyOption) => {
+    const current = finding.morphology || [];
+    const next = current.includes(opt) ? current.filter((m) => m !== opt) : [...current, opt];
+    onSaveFinding({ ...finding, morphology: next });
+  };
+
+  const isSuperficial = finding.category === 'superficial';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden text-slate-100 my-8">
+        {/* Modal Top Header */}
+        <div className="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-teal-950 border border-teal-800 text-teal-300">
+              {finding.status === 'abnormal' ? (
+                <AlertTriangle className="w-5 h-5 text-rose-400 animate-pulse" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                {finding.vesselName}
+                <span className="text-xs uppercase bg-slate-800 px-2 py-0.5 rounded text-teal-300 font-semibold border border-slate-700">
+                  {finding.side.toUpperCase()}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">Detailed Sonographic Examination & Extent Documentation</p>
+            </div>
+          </div>
+
+          <button onClick={onClose} className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Form Body */}
+        <div className="p-5 space-y-5 text-xs max-h-[75vh] overflow-y-auto">
+          {/* Status Bar */}
+          <div>
+            <label className="block text-slate-400 font-bold uppercase tracking-wider text-[11px] mb-1.5">
+              Vessel Examination Status
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { id: 'normal', label: 'Normal / Clear' },
+                { id: 'abnormal', label: 'Abnormal / Thrombus' },
+                { id: 'not_visualised', label: 'Not Visualised' },
+                { id: 'not_assessed', label: 'Not Assessed' }
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() =>
+                    onSaveFinding({
+                      ...finding,
+                      status: st.id as any,
+                      thrombusPresence: st.id === 'abnormal' ? 'thrombus_present' : undefined,
+                      compressibility: st.id === 'normal' ? 'fully_compressible' : 'non_compressible',
+                      patency: st.id === 'normal' ? 'patent' : 'completely_occluded',
+                      chronicity: st.id === 'abnormal' ? 'acute_appearing' : undefined
+                    })
+                  }
+                  className={`py-2 rounded-lg font-semibold border text-center transition-all ${
+                    finding.status === st.id
+                      ? st.id === 'normal'
+                        ? 'bg-emerald-700 border-emerald-500 text-white'
+                        : st.id === 'abnormal'
+                        ? 'bg-rose-700 border-rose-500 text-white shadow-lg'
+                        : 'bg-slate-700 border-slate-500 text-white'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Expanded Abnormality Section */}
+          {finding.status === 'abnormal' && (
+            <div className="space-y-4 p-4 bg-slate-950/80 border border-slate-800 rounded-xl">
+              {/* Compressibility & Patency */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Transducer Compressibility</label>
+                  <select
+                    value={finding.compressibility || 'non_compressible'}
+                    onChange={(e) => onSaveFinding({ ...finding, compressibility: e.target.value as Compressibility })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium"
+                  >
+                    <option value="fully_compressible">Fully Compressible</option>
+                    <option value="partially_compressible">Partially Compressible</option>
+                    <option value="non_compressible">Non-Compressible</option>
+                    <option value="compression_not_possible">Compression Not Possible (Pain/Position)</option>
+                    <option value="not_applicable">Not Applicable</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Lumen Patency / Occlusion</label>
+                  <select
+                    value={finding.patency || 'completely_occluded'}
+                    onChange={(e) => onSaveFinding({ ...finding, patency: e.target.value as Patency })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium"
+                  >
+                    <option value="patent">Patent</option>
+                    <option value="mostly_patent">Mostly Patent</option>
+                    <option value="partially_occluded">Partially Occluded</option>
+                    <option value="mostly_occluded">Mostly Occluded</option>
+                    <option value="completely_occluded">Completely Occluded</option>
+                    <option value="recanalised">Recanalised / Channels Present</option>
+                    <option value="chronic_post_thrombotic_no_acute">Chronic Post-Thrombotic Change</option>
+                    <option value="indeterminate">Indeterminate Patency</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Echogenicity & Chronicity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Thrombus Echogenicity</label>
+                  <select
+                    value={finding.echogenicity || 'hypoechoic'}
+                    onChange={(e) => onSaveFinding({ ...finding, echogenicity: e.target.value as ThrombusEchogenicity })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100"
+                  >
+                    <option value="anechoic_hypoechoic">Anechoic / Very Hypoechoic</option>
+                    <option value="hypoechoic">Hypoechoic</option>
+                    <option value="mixed_echogenicity">Mixed Echogenicity</option>
+                    <option value="intermediate_echogenicity">Intermediate Echogenicity</option>
+                    <option value="echogenic">Echogenic</option>
+                    <option value="highly_echogenic">Highly Echogenic</option>
+                    <option value="calcified">Calcified</option>
+                    <option value="heterogeneous">Heterogeneous</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Sonographic Chronicity Appearance</label>
+                  <select
+                    value={finding.chronicity || 'acute_appearing'}
+                    onChange={(e) => onSaveFinding({ ...finding, chronicity: e.target.value as SonographicChronicity })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-teal-300 font-semibold"
+                  >
+                    <option value="acute_appearing">Acute-Appearing</option>
+                    <option value="subacute_appearing">Subacute-Appearing</option>
+                    <option value="chronic_post_thrombotic">Chronic / Post-Thrombotic Appearance</option>
+                    <option value="acute_on_chronic">Acute-on-Chronic Appearance</option>
+                    <option value="indeterminate_age">Indeterminate Age</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Landmark Extent Fields */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-3">
+                <span className="font-bold text-teal-400 uppercase tracking-wider text-[11px] block">
+                  LANDMARK-BASED THROMBUS EXTENT
+                </span>
+
+                {/* Proximal Extent */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                  <span className="text-slate-400 font-semibold">Proximal Extent:</span>
+                  <input
+                    type="number"
+                    placeholder="Distance"
+                    value={finding.proximalExtent?.distance ?? ''}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        proximalExtent: {
+                          distance: e.target.value ? Number(e.target.value) : null,
+                          unit: finding.proximalExtent?.unit || 'mm',
+                          relation: finding.proximalExtent?.relation || 'above',
+                          landmark: finding.proximalExtent?.landmark || 'knee_crease'
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
+                  />
+                  <select
+                    value={finding.proximalExtent?.unit || 'mm'}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        proximalExtent: {
+                          ...(finding.proximalExtent as any),
+                          unit: e.target.value as any
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
+                  >
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                  </select>
+                  <select
+                    value={finding.proximalExtent?.landmark || 'knee_crease'}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        proximalExtent: {
+                          ...(finding.proximalExtent as any),
+                          landmark: e.target.value as Landmark
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 truncate"
+                  >
+                    {Object.entries(LANDMARK_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Distal Extent */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                  <span className="text-slate-400 font-semibold">Distal Extent:</span>
+                  <input
+                    type="number"
+                    placeholder="Distance"
+                    value={finding.distalExtent?.distance ?? ''}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        distalExtent: {
+                          distance: e.target.value ? Number(e.target.value) : null,
+                          unit: finding.distalExtent?.unit || 'mm',
+                          relation: finding.distalExtent?.relation || 'below',
+                          landmark: finding.distalExtent?.landmark || 'knee_crease'
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
+                  />
+                  <select
+                    value={finding.distalExtent?.unit || 'mm'}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        distalExtent: {
+                          ...(finding.distalExtent as any),
+                          unit: e.target.value as any
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
+                  >
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                  </select>
+                  <select
+                    value={finding.distalExtent?.landmark || 'knee_crease'}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        distalExtent: {
+                          ...(finding.distalExtent as any),
+                          landmark: e.target.value as Landmark
+                        }
+                      })
+                    }
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 truncate"
+                  >
+                    {Object.entries(LANDMARK_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Special Superficial Distance to Junction (SFJ / SPJ) */}
+              {isSuperficial && (
+                <div className="p-3 bg-amber-950/40 border border-amber-800/80 rounded-lg space-y-2">
+                  <span className="font-bold text-amber-300 text-[11px] block">
+                    SUPERFICIAL THROMBUS PROXIMITY TO JUNCTION (SFJ / SPJ)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                    <div>
+                      <label className="text-slate-400">Junction:</label>
+                      <select
+                        value={finding.distanceToJunction?.junction || 'SFJ'}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            distanceToJunction: {
+                              junction: e.target.value as any,
+                              distanceMm: finding.distanceToJunction?.distanceMm || 0,
+                              extensionIntoDeep: finding.distanceToJunction?.extensionIntoDeep || 'no_extension'
+                            }
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 mt-0.5"
+                      >
+                        <option value="SFJ">Saphenofemoral Junction (SFJ)</option>
+                        <option value="SPJ">Saphenopopliteal Junction (SPJ)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400">Distance to Junction (mm):</label>
+                      <input
+                        type="number"
+                        placeholder="Distance in mm"
+                        value={finding.distanceToJunction?.distanceMm ?? ''}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            distanceToJunction: {
+                              junction: finding.distanceToJunction?.junction || 'SFJ',
+                              distanceMm: Number(e.target.value),
+                              extensionIntoDeep: finding.distanceToJunction?.extensionIntoDeep || 'no_extension'
+                            }
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 mt-0.5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400">Deep Extension:</label>
+                      <select
+                        value={finding.distanceToJunction?.extensionIntoDeep || 'no_extension'}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            distanceToJunction: {
+                              junction: finding.distanceToJunction?.junction || 'SFJ',
+                              distanceMm: finding.distanceToJunction?.distanceMm || 0,
+                              extensionIntoDeep: e.target.value as any
+                            }
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 mt-0.5"
+                      >
+                        <option value="no_extension">No Extension Into Deep System</option>
+                        <option value="extension">Extension Into Deep Vein</option>
+                        <option value="unable_to_determine">Unable to Determine</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Morphology Checkboxes */}
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1.5">Additional Morphological Features</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {MORPHOLOGY_ITEMS.map((item) => {
+                    const isChecked = (finding.morphology || []).includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleMorphologyToggle(item.id)}
+                        className={`px-2.5 py-1.5 rounded text-[11px] text-left transition-colors border ${
+                          isChecked
+                            ? 'bg-teal-950 border-teal-700 text-teal-200 font-semibold'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Free Text Notes */}
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Specific Sonographer Comments</label>
+                <textarea
+                  rows={2}
+                  placeholder="Enter specific observations e.g. non-occlusive thrombus tail, collateral channel recruitment..."
+                  value={finding.comments || ''}
+                  onChange={(e) => onSaveFinding({ ...finding, comments: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer Controls */}
+        <div className="px-5 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-lg shadow-sm transition-colors"
+          >
+            Done & Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

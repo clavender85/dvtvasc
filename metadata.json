@@ -1,0 +1,6 @@
+{
+  "name": "Ultrasound Lower Limb DVT Worksheet",
+  "description": "Clinical documentation tool and structured reporting system for sonographers performing venous duplex ultrasound examination for deep vein thrombosis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
