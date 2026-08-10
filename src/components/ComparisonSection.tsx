@@ -1,195 +1,271 @@
-// Comparison with Previous Examination Workflow Component
+// Comprehensive Prior Study Comparison Section Component
 
-import React from 'react';
-import { VesselComparison, ComparisonOutcome, ExamState, VesselFinding } from '../types/dvt';
-import { GitCompare, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { ExamState, VesselComparison, PriorExamHeader, PriorExamRecord, PriorVesselFinding } from '../types/dvt';
+import { PriorHeaderSection } from './PriorHeaderSection';
+import { ThreeColumnWorkspace } from './ThreeColumnWorkspace';
+import { SideBySideDiagramView } from './SideBySideDiagramView';
+import { PriorManualEntryModal } from './PriorManualEntryModal';
+import { buildVesselComparisons, generateIntervalComparisonSummary, getComparisonValidationWarnings } from '../utils/comparisonEngine';
+import { GitCompare, LayoutGrid, Eye, FileText, AlertTriangle, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface ComparisonSectionProps {
   state: ExamState;
-  onChangeComparisons: (comparisons: VesselComparison[]) => void;
+  onChangeExamState: (nextState: ExamState) => void;
 }
 
-const COMPARISON_OUTCOMES: ComparisonOutcome[] = [
-  'New thrombus',
-  'Interval extension',
-  'Interval reduction',
-  'Stable/no significant change',
-  'Improved recanalisation',
-  'Increased occlusion',
-  'Resolved',
-  'Residual chronic/post-thrombotic change',
-  'Unable to compare',
-  'Indeterminate'
-];
+export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ state, onChangeExamState }) => {
+  const [activeTab, setActiveTab] = useState<'workspace' | 'diagram'>('workspace');
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
-export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ state, onChangeComparisons }) => {
-  const { history, vesselFindings, comparisons } = state;
+  // Initialize comparisonState if undefined
+  const cState = state.comparisonState || {
+    header: {
+      hasPriorExam: state.history.hasPreviousDvt === 'Yes',
+      examDate: state.history.previousStudyDate || '2026-05-10',
+      location: 'Same institution',
+      imagesAvailable: 'Yes',
+      comparisonSource: 'Previous worksheet data available',
+      quality: 'Adequate for comparison',
+      confidence: 'HIGH',
+      anticoagulationStatus: state.history.anticoagulationDetails || 'Current anticoagulation'
+    },
+    priorFindings: {},
+    thrombusGroups: [],
+    priorTimeline: [],
+    viewMode: '3column',
+    filterMode: 'abnormal_or_changed_only',
+    includeDiagramInPrint: true
+  };
 
-  // Auto-populate abnormal vessels into comparison list if empty
-  const populateComparisonTable = () => {
-    const abnormalVessels = (Object.values(vesselFindings) as VesselFinding[]).filter((f) => f.status === 'abnormal');
-
-    const nextComparisons: VesselComparison[] = abnormalVessels.map((f) => {
-      const existing = comparisons.find((c) => c.vesselId === f.id);
-      if (existing) return existing;
-
-      // Auto-suggest outcome based on prior history
-      let suggested: ComparisonOutcome = 'Stable/no significant change';
-      if (history.hasPreviousDvt === 'No') {
-        suggested = 'New thrombus';
-      } else if (f.patency === 'recanalised') {
-        suggested = 'Improved recanalisation';
+  // Header update handler
+  const handleHeaderChange = (nextHeader: PriorExamHeader) => {
+    const updatedState: ExamState = {
+      ...state,
+      comparisonState: {
+        ...cState,
+        header: nextHeader
       }
-
-      return {
-        vesselId: f.id,
-        vesselName: f.vesselName,
-        priorStatus: history.previousReportSummary || 'Prior exam findings',
-        priorExtent: history.previousThrombusExtent || 'Unknown prior extent',
-        currentStatus: `${f.patency?.replace(/_/g, ' ')} (${f.chronicity?.replace(/_/g, ' ')})`,
-        currentExtent: `${f.proximalExtent?.distance || ''} ${f.proximalExtent?.unit || ''} to ${f.distalExtent?.distance || ''} ${f.distalExtent?.unit || ''}`,
-        suggestedOutcome: suggested,
-        confirmedOutcome: suggested,
-        confirmed: true,
-        notes: ''
-      };
+    };
+    // Re-evaluate comparisons with updated header
+    const nextComps = buildVesselComparisons(updatedState);
+    onChangeExamState({
+      ...updatedState,
+      comparisons: nextComps
     });
-
-    onChangeComparisons(nextComparisons);
   };
 
-  const handleUpdateComparison = (vId: string, updates: Partial<VesselComparison>) => {
-    const next = comparisons.map((c) => (c.vesselId === vId ? { ...c, ...updates } : c));
-    onChangeComparisons(next);
+  // Import Structured Prior
+  const handleImportStructuredPrior = (record: PriorExamRecord) => {
+    const updatedState: ExamState = {
+      ...state,
+      comparisonState: {
+        ...cState,
+        header: {
+          ...cState.header,
+          hasPriorExam: true,
+          examDate: record.examDate,
+          location: (record.location as any) || 'Same institution',
+          comparisonSource: 'Previous worksheet data available'
+        },
+        priorFindings: record.vesselFindings,
+        activePriorExamId: record.id,
+        priorTimeline: cState.priorTimeline.some((r) => r.id === record.id)
+          ? cState.priorTimeline
+          : [record, ...cState.priorTimeline]
+      }
+    };
+
+    const nextComps = buildVesselComparisons(updatedState);
+    onChangeExamState({
+      ...updatedState,
+      comparisons: nextComps
+    });
   };
+
+  // Manual Findings Save Handler
+  const handleSaveManualPriorFindings = (findings: Record<string, PriorVesselFinding>) => {
+    const updatedState: ExamState = {
+      ...state,
+      comparisonState: {
+        ...cState,
+        header: {
+          ...cState.header,
+          hasPriorExam: true,
+          comparisonSource: 'Report reviewed only'
+        },
+        priorFindings: findings
+      }
+    };
+
+    const nextComps = buildVesselComparisons(updatedState);
+    onChangeExamState({
+      ...updatedState,
+      comparisons: nextComps
+    });
+  };
+
+  // Clear Prior Study
+  const handleClearPriorStudy = () => {
+    const updatedState: ExamState = {
+      ...state,
+      comparisonState: {
+        ...cState,
+        header: {
+          ...cState.header,
+          hasPriorExam: false
+        },
+        priorFindings: {}
+      },
+      comparisons: []
+    };
+    onChangeExamState(updatedState);
+  };
+
+  // Auto-Calculate / Re-evaluate Comparisons
+  const handleRefreshComparisons = () => {
+    const nextComps = buildVesselComparisons(state);
+    onChangeExamState({
+      ...state,
+      comparisons: nextComps
+    });
+  };
+
+  // Confirm All Suggestions
+  const handleConfirmAll = () => {
+    const nextComps = state.comparisons.map((c) => ({ ...c, confirmed: true }));
+    onChangeExamState({
+      ...state,
+      comparisons: nextComps
+    });
+  };
+
+  // Comparisons change handler
+  const handleComparisonsChange = (comps: VesselComparison[]) => {
+    onChangeExamState({
+      ...state,
+      comparisons: comps
+    });
+  };
+
+  // Get Validation Warnings
+  const warnings = getComparisonValidationWarnings(state);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md text-slate-100 p-4 space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <GitCompare className="w-5 h-5 text-teal-400" />
-          <div>
-            <h3 className="font-bold text-sm text-slate-100 uppercase tracking-wider">
-              COMPARISON WITH PRIOR EXAMINATION
-            </h3>
-            <p className="text-xs text-slate-400">
-              Systematic comparison of current vessel findings against prior study ({history.previousStudyDate || 'Date not specified'})
-            </p>
+    <div className="space-y-5">
+      {/* 1. Prior Examination Header & Systematic Config */}
+      <PriorHeaderSection
+        header={cState.header}
+        onChangeHeader={handleHeaderChange}
+        onImportStructuredPrior={handleImportStructuredPrior}
+        onOpenManualEntryModal={() => setIsManualModalOpen(true)}
+        onClearPriorStudy={handleClearPriorStudy}
+        priorTimeline={cState.priorTimeline}
+        activePriorExamId={cState.activePriorExamId}
+        onSelectPriorTimelineExam={(examId) => {
+          const found = cState.priorTimeline.find((r) => r.id === examId);
+          if (found) handleImportStructuredPrior(found);
+        }}
+      />
+
+      {/* Main Comparison Section (Visible when Prior Exam Available) */}
+      {cState.header.hasPriorExam && (
+        <div className="space-y-4">
+          {/* Section Navigation Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('workspace')}
+                className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
+                  activeTab === 'workspace'
+                    ? 'bg-teal-700 text-white shadow-md'
+                    : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                3-Column Comparison Workspace
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('diagram')}
+                className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
+                  activeTab === 'diagram'
+                    ? 'bg-teal-700 text-white shadow-md'
+                    : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                Graphical Map Comparison
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRefreshComparisons}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Recalculate interval changes from current vessel findings"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-teal-400" />
+              Recalculate Comparisons
+            </button>
+          </div>
+
+          {/* Clinical Validation Warnings Drawer */}
+          {warnings.length > 0 && (
+            <div className="p-4 bg-amber-950/80 border border-amber-800 rounded-2xl space-y-2 text-xs text-amber-200 shadow-md">
+              <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                Clinical Comparison Logic Verification ({warnings.length} Alerts):
+              </div>
+              <ul className="space-y-1.5 list-disc pl-5">
+                {warnings.map((w) => (
+                  <li key={w.id} className="leading-relaxed">
+                    <strong>{w.title}:</strong> {w.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Active Tab Body */}
+          {activeTab === 'workspace' && (
+            <ThreeColumnWorkspace
+              state={state}
+              onChangeComparisons={handleComparisonsChange}
+              onConfirmAll={handleConfirmAll}
+            />
+          )}
+
+          {activeTab === 'diagram' && <SideBySideDiagramView state={state} />}
+
+          {/* Automated Comparison Summary Excerpt Box */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 shadow-md">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-teal-400" />
+                Generated Interval Comparison Report Text Preview:
+              </span>
+              <span className="text-[10px] font-bold text-teal-300 bg-teal-950 border border-teal-800 px-2.5 py-0.5 rounded-full">
+                Auto-Synchronised
+              </span>
+            </div>
+
+            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800 leading-relaxed">
+              {generateIntervalComparisonSummary(state)}
+            </pre>
           </div>
         </div>
-
-        <button
-          onClick={populateComparisonTable}
-          className="bg-teal-700 hover:bg-teal-600 text-white font-medium text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-        >
-          Auto-Populate Abnormal Vessels
-        </button>
-      </div>
-
-      {/* Safety Notice */}
-      <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 flex items-center gap-2">
-        <AlertCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
-        <span>
-          <strong>Clinical Rule:</strong> Comparison outcomes must be explicitly verified and confirmed by the sonographer before appearing in the final summary report.
-        </span>
-      </div>
-
-      {/* Comparison Table */}
-      {comparisons.length === 0 ? (
-        <div className="p-6 text-center text-slate-500 bg-slate-950/50 rounded-lg border border-dashed border-slate-800 text-xs">
-          No comparison records generated yet. Click "Auto-Populate Abnormal Vessels" above to load current abnormal findings for prior study comparison.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {comparisons.map((comp) => (
-            <div
-              key={comp.vesselId}
-              className={`p-3.5 rounded-lg border text-xs space-y-3 transition-colors ${
-                comp.confirmed ? 'bg-slate-950 border-teal-800/80' : 'bg-slate-950/60 border-slate-800'
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                <span className="font-bold text-sm text-teal-300">{comp.vesselName}</span>
-
-                {/* Confirmed Toggle */}
-                <button
-                  onClick={() => handleUpdateComparison(comp.vesselId, { confirmed: !comp.confirmed })}
-                  className={`px-3 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                    comp.confirmed ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {comp.confirmed ? 'Confirmed for Summary' : 'Click to Confirm'}
-                </button>
-              </div>
-
-              {/* Side-by-side Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Prior Study State */}
-                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded text-slate-300">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                    Prior Study Findings ({history.previousStudyDate || 'Prior'})
-                  </span>
-                  <input
-                    type="text"
-                    value={comp.priorStatus}
-                    onChange={(e) => handleUpdateComparison(comp.vesselId, { priorStatus: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100"
-                    placeholder="Prior status..."
-                  />
-                </div>
-
-                {/* Current Exam State */}
-                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded text-slate-300">
-                  <span className="text-[10px] uppercase font-bold text-teal-400 block mb-1">
-                    Today's Examination Findings
-                  </span>
-                  <input
-                    type="text"
-                    value={comp.currentStatus}
-                    onChange={(e) => handleUpdateComparison(comp.vesselId, { currentStatus: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100"
-                    placeholder="Current status..."
-                  />
-                </div>
-              </div>
-
-              {/* Outcome Selection Dropdown */}
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="font-bold text-slate-300">Sonographer Comparison Outcome:</label>
-                <select
-                  value={comp.confirmedOutcome}
-                  onChange={(e) =>
-                    handleUpdateComparison(comp.vesselId, {
-                      confirmedOutcome: e.target.value as ComparisonOutcome,
-                      confirmed: true
-                    })
-                  }
-                  className="bg-slate-900 border border-teal-600 rounded px-3 py-1 text-teal-300 font-bold"
-                >
-                  {COMPARISON_OUTCOMES.map((out) => (
-                    <option key={out} value={out}>
-                      {out}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <input
-                  type="text"
-                  placeholder="Comparison summary statement for report e.g. 'Previously demonstrated thrombus has reduced in extent with partial recanalisation'..."
-                  value={comp.notes}
-                  onChange={(e) => handleUpdateComparison(comp.vesselId, { notes: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-100 text-xs"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
       )}
+
+      {/* Manual Entry Modal */}
+      <PriorManualEntryModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        priorFindings={cState.priorFindings}
+        onSavePriorFindings={handleSaveManualPriorFindings}
+      />
     </div>
   );
 };

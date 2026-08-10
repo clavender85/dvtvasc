@@ -2,6 +2,7 @@
 
 import { ExamState, VesselFinding, Side, SonographicChronicity, Patency, Compressibility } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
+import { generateIntervalComparisonSummary, generateKeyComparisonFinding } from './comparisonEngine';
 
 function formatExtent(f: VesselFinding): string {
   if (!f.proximalExtent?.distance && !f.distalExtent?.distance) return '';
@@ -74,7 +75,8 @@ function formatCompressibility(c?: Compressibility): string {
 
 export function generateSonographerSummary(state: ExamState): string {
   const lines: string[] = [];
-  const { header, history, limitations, vesselFindings, doppler, pelvic, otherFindings, comparisons } = state;
+  const { header, history, limitations, vesselFindings, doppler, pelvic, otherFindings, comparisons, comparisonState } = state;
+  const hasPrior = comparisonState?.header?.hasPriorExam || comparisons.length > 0;
 
   // 1. Clinical Indication & Scope
   lines.push(`EXAMINATION: Venous Duplex Ultrasound - ${header.examType.toUpperCase()}`);
@@ -86,7 +88,18 @@ export function generateSonographerSummary(state: ExamState): string {
   }
   lines.push('');
 
-  // 2. Limitations
+  // 2. Prior Study Header if present
+  if (hasPrior && comparisonState?.header) {
+    const pHead = comparisonState.header;
+    lines.push('=== PRIOR EXAMINATION COMPARISON PROTOCOL ===');
+    lines.push(`Previous Examination Available: YES (Date: ${pHead.examDate || 'Not specified'}, Location: ${pHead.location}).`);
+    lines.push(`Comparison Source: ${pHead.comparisonSource} (Images Available: ${pHead.imagesAvailable}).`);
+    lines.push(`Prior Study Quality: ${pHead.quality} | Confidence: ${pHead.confidence}.`);
+    if (pHead.anticoagulationStatus) lines.push(`Prior Anticoagulation: ${pHead.anticoagulationStatus}.`);
+    lines.push('');
+  }
+
+  // 3. Limitations
   if (limitations.hasLimitations) {
     const factorsText = limitations.factors.map((f) => f.replace(/_/g, ' ')).join(', ');
     lines.push(`EXAMINATION LIMITATIONS: ${limitations.severity.toUpperCase()} limitations due to ${factorsText}. ${limitations.customDetails}`);
@@ -194,7 +207,7 @@ export function generateSonographerSummary(state: ExamState): string {
   processLimb('right', 'Right');
   processLimb('left', 'Left');
 
-  // 3. Pelvic Assessment
+  // 4. Pelvic Assessment
   if (
     header.examType === 'Pelvic/iliocaval assessment' ||
     pelvic.ivcVisualised !== 'not_visualised' ||
@@ -211,7 +224,7 @@ export function generateSonographerSummary(state: ExamState): string {
     lines.push('');
   }
 
-  // 4. Superficial Veins
+  // 5. Superficial Veins
   const superficialVessels = ANATOMICAL_VESSELS.filter((v) => v.category === 'superficial');
   const abnormalSuperficial: VesselFinding[] = [];
 
@@ -237,7 +250,7 @@ export function generateSonographerSummary(state: ExamState): string {
   }
   lines.push('');
 
-  // 5. Other / Non-venous Findings
+  // 6. Other / Non-venous Findings
   if (otherFindings.length > 0) {
     lines.push('=== OTHER / NON-VENOUS FINDINGS ===');
     otherFindings.forEach((of) => {
@@ -246,20 +259,21 @@ export function generateSonographerSummary(state: ExamState): string {
     lines.push('');
   }
 
-  // 6. Comparison
-  if (comparisons.length > 0) {
-    lines.push('=== COMPARISON WITH PRIOR EXAMINATION ===');
-    if (history.previousStudyDate) lines.push(`Prior Study Date: ${history.previousStudyDate}`);
-    comparisons.forEach((comp) => {
-      if (comp.confirmed) {
-        lines.push(`• ${comp.vesselName}: ${comp.confirmedOutcome.toUpperCase()}. Current: ${comp.currentStatus}. ${comp.notes}`);
-      }
-    });
+  // 7. Confirmed Interval Comparison Summary
+  if (hasPrior && comparisons.length > 0) {
+    lines.push('=== INTERVAL COMPARISON SUMMARY ===');
+    lines.push(generateIntervalComparisonSummary(state));
     lines.push('');
   }
 
-  // 7. Impression / Key Findings
+  // 8. Impression / Key Findings
   lines.push('=== SONOGRAPHER IMPRESSION / KEY FINDINGS ===');
+  const keyCompFinding = generateKeyComparisonFinding(state);
+  if (keyCompFinding) {
+    lines.push(`KEY COMPARISON FINDING: ${keyCompFinding}`);
+    lines.push('');
+  }
+
   const abnormalDeepCount = (Object.values(vesselFindings) as VesselFinding[]).filter(
     (f) => f.category !== 'superficial' && f.status === 'abnormal' && f.thrombusPresence === 'thrombus_present'
   ).length;
@@ -285,3 +299,4 @@ export function generateSonographerSummary(state: ExamState): string {
 
   return lines.join('\n');
 }
+

@@ -245,16 +245,57 @@ export const DEMO_CASE_3_FOLLOWUP_RECANALISED: ExamState = {
 
     return vf;
   })(),
+  comparisonState: {
+    header: {
+      hasPriorExam: true,
+      examDate: '2026-05-10',
+      location: 'Same institution',
+      imagesAvailable: 'Yes',
+      comparisonSource: 'Previous worksheet data available',
+      quality: 'Adequate for comparison',
+      confidence: 'HIGH',
+      anticoagulationStatus: 'Rivaroxaban 20mg OD'
+    },
+    priorFindings: {
+      left_POPV: {
+        vesselId: 'left_POPV',
+        vesselName: 'Left Popliteal Vein',
+        side: 'left',
+        category: 'popliteal',
+        status: 'abnormal',
+        thrombusPresence: 'thrombus_present',
+        compressibility: 'non_compressible',
+        patency: 'completely_occluded',
+        chronicity: 'acute_appearing',
+        proximalExtent: {
+          distance: 50,
+          unit: 'mm',
+          relation: 'above',
+          landmark: 'knee_crease'
+        },
+        comments: 'Completely occluded acute hypoechoic popliteal thrombus extending 50mm above knee crease.'
+      }
+    },
+    thrombusGroups: [],
+    priorTimeline: [],
+    viewMode: '3column',
+    filterMode: 'abnormal_or_changed_only',
+    includeDiagramInPrint: true
+  },
   comparisons: [
     {
       vesselId: 'left_POPV',
       vesselName: 'Left Popliteal Vein',
-      priorStatus: 'Completely occluded acute thrombus',
-      priorExtent: 'Full length popliteal vein',
-      currentStatus: 'Partially compressible, recanalised chronic thrombus',
-      currentExtent: '40mm above to 30mm below knee crease',
-      suggestedOutcome: 'Improved recanalisation',
-      confirmedOutcome: 'Improved recanalisation',
+      side: 'left',
+      category: 'popliteal',
+      priorStatus: 'Completely occluded acute thrombus extending 50mm above knee crease',
+      priorExtent: '50 mm above knee crease',
+      currentStatus: 'Partially compressible, recanalised chronic thrombus 40mm above knee crease',
+      currentExtent: '40 mm above knee crease',
+      suggestedOutcome: 'IMPROVED RECANALISATION',
+      confirmedOutcome: 'IMPROVED RECANALISATION',
+      suggestedStatement: 'Persistent left popliteal thrombus with improved recanalisation and interval reduction in proximal extent.',
+      confirmedStatement: 'Substantial improvement in luminal flow and partial recanalisation compared with 3-month prior study.',
       confirmed: true,
       notes: 'Substantial improvement in luminal flow and partial recanalisation compared with 3-month prior study.'
     }

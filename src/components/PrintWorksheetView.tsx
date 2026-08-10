@@ -134,6 +134,35 @@ export const PrintWorksheetView: React.FC<PrintWorksheetViewProps> = ({ state, s
         </tbody>
       </table>
 
+      {/* Prior Study Comparisons Table */}
+      {comparisons.length > 0 && (
+        <>
+          <h2 className="font-bold text-sm uppercase border-b border-slate-400 mb-2">Prior Study Serial Comparison Summary</h2>
+          <table className="w-full border-collapse border border-slate-300 mb-4 text-[11px]">
+            <thead>
+              <tr className="bg-slate-200 text-left font-bold">
+                <th className="border border-slate-300 p-1.5">Vessel Segment</th>
+                <th className="border border-slate-300 p-1.5">Previous Finding ({state.comparisonState?.header?.examDate || 'Prior'})</th>
+                <th className="border border-slate-300 p-1.5">Current Finding</th>
+                <th className="border border-slate-300 p-1.5">Confirmed Interval Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparisons.map((c) => (
+                <tr key={c.vesselId}>
+                  <td className="border border-slate-300 p-1 font-bold">{c.vesselName}</td>
+                  <td className="border border-slate-300 p-1">{c.priorStatus}</td>
+                  <td className="border border-slate-300 p-1">{c.currentStatus}</td>
+                  <td className="border border-slate-300 p-1 font-bold text-slate-800">
+                    {c.confirmedOutcome}: {c.confirmedStatement || c.suggestedStatement}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
       {/* Summary Report Output */}
       <h2 className="font-bold text-sm uppercase border-b border-slate-400 mb-2">Sonographer Findings Summary</h2>
       <div className="bg-slate-50 border border-slate-300 p-4 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed mb-6">

@@ -419,7 +419,7 @@ export const App: React.FC = () => {
         {activeTab === 'comparison' && (
           <ComparisonSection
             state={examState}
-            onChangeComparisons={(comparisons) => setExamState({ ...examState, comparisons })}
+            onChangeExamState={(nextState) => setExamState(nextState)}
           />
         )}
 

@@ -236,6 +236,23 @@ export interface OtherFindingItem {
 }
 
 export type ComparisonOutcome =
+  | 'NEW'
+  | 'PERSISTENT'
+  | 'STABLE'
+  | 'EXTENDED PROXIMALLY'
+  | 'EXTENDED DISTALLY'
+  | 'INCREASED EXTENT'
+  | 'REDUCED EXTENT'
+  | 'IMPROVED RECANALISATION'
+  | 'REDUCED RECANALISATION'
+  | 'INCREASED OCCLUSION'
+  | 'REDUCED OCCLUSION'
+  | 'RESOLVED'
+  | 'RESIDUAL POST-THROMBOTIC CHANGE'
+  | 'ACUTE-APPEARING THROMBUS ON CHRONIC CHANGE'
+  | 'INDETERMINATE CHANGE'
+  | 'UNABLE TO COMPARE'
+  // Legacy aliases for backward compatibility
   | 'New thrombus'
   | 'Interval extension'
   | 'Interval reduction'
@@ -247,17 +264,110 @@ export type ComparisonOutcome =
   | 'Unable to compare'
   | 'Indeterminate';
 
+export type PriorExamLocation = 'Same institution' | 'External institution' | 'Unknown';
+
+export type ComparisonSource =
+  | 'Images and report reviewed'
+  | 'Images reviewed'
+  | 'Report reviewed only'
+  | 'Previous worksheet data available'
+  | 'Patient history only'
+  | 'Other';
+
+export type PriorStudyQuality =
+  | 'Adequate for comparison'
+  | 'Partially adequate'
+  | 'Limited'
+  | 'Unable to reliably compare';
+
+export type ComparisonConfidence = 'HIGH' | 'MODERATE' | 'LIMITED';
+
+export interface PriorExamHeader {
+  hasPriorExam: boolean;
+  examDate: string;
+  location: PriorExamLocation;
+  imagesAvailable: 'Yes' | 'No' | 'Report only';
+  comparisonSource: ComparisonSource;
+  quality: PriorStudyQuality;
+  confidence: ComparisonConfidence;
+  anticoagulationStatus: string;
+  comments?: string;
+}
+
+export interface PriorVesselFinding {
+  vesselId: string;
+  vesselName: string;
+  side: Side;
+  category: VesselCategory;
+  status: VesselStatus; // 'normal' | 'abnormal' | 'not_visualised' | 'not_assessed'
+  thrombusPresence?: ThrombusPresence | 'not_documented';
+  compressibility?: Compressibility | 'not_documented';
+  patency?: Patency | 'not_documented';
+  echogenicity?: ThrombusEchogenicity | 'not_documented';
+  chronicity?: SonographicChronicity | 'not_documented';
+  proximalExtent?: ExtentLandmark;
+  distalExtent?: ExtentLandmark;
+  distanceToJunctionMm?: number;
+  comments?: string;
+}
+
+export interface ThrombusGroup {
+  id: string;
+  name: string;
+  side: Side;
+  vesselIds: string[];
+  overallProximalExtent?: ExtentLandmark;
+  overallDistalExtent?: ExtentLandmark;
+  isContinuous: boolean;
+  suggestedOutcome?: ComparisonOutcome;
+  confirmedOutcome?: ComparisonOutcome;
+  summary: string;
+}
+
+export interface PriorExamRecord {
+  id: string;
+  examDate: string;
+  patientId: string;
+  location?: string;
+  summaryText: string;
+  vesselFindings: Record<string, PriorVesselFinding>;
+}
+
+export interface ComparisonState {
+  header: PriorExamHeader;
+  priorFindings: Record<string, PriorVesselFinding>;
+  thrombusGroups: ThrombusGroup[];
+  priorTimeline: PriorExamRecord[];
+  activePriorExamId?: string;
+  viewMode: '3column' | 'diagram_side_by_side' | 'diagram_overlay' | 'change_map';
+  filterMode: 'abnormal_or_changed_only' | 'all_assessed';
+  includeDiagramInPrint: boolean;
+}
+
 export interface VesselComparison {
   vesselId: string;
   vesselName: string;
+  side?: Side;
+  category?: VesselCategory;
+  
   priorStatus: string;
   priorExtent: string;
+  priorFinding?: PriorVesselFinding;
+  
   currentStatus: string;
   currentExtent: string;
+  currentFinding?: VesselFinding;
+  
   suggestedOutcome: ComparisonOutcome;
   confirmedOutcome: ComparisonOutcome;
+  suggestedStatement?: string;
+  confirmedStatement?: string;
+  
   confirmed: boolean;
   notes: string;
+  
+  isThrombusGroupMember?: boolean;
+  groupId?: string;
 }
 
 export interface ValidationAlert {
@@ -277,6 +387,7 @@ export interface ExamState {
   pelvic: PelvicAssessment;
   otherFindings: OtherFindingItem[];
   comparisons: VesselComparison[];
+  comparisonState?: ComparisonState;
   generatedSummary: string;
   userSummaryEdited: boolean;
   sonographerSignOff: boolean;
