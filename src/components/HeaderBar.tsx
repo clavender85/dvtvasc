@@ -124,10 +124,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <button
             onClick={onMarkAssessedNormal}
             className="bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-600 px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-colors shadow-sm"
-            title="Mark all routinely assessed vessels as normal"
+            title="Mark protocol-defined routine assessed vessels normal"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-            Mark Assessed Normal
+            Mark Routine Assessed Segments Normal
           </button>
 
           <button

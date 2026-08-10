@@ -117,21 +117,25 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
             <div className="space-y-4 p-4 bg-slate-950/80 border border-slate-800 rounded-xl">
               {/* Compressibility & Patency */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Transducer Compressibility</label>
-                  <select
-                    value={finding.compressibility || 'non_compressible'}
-                    onChange={(e) => onSaveFinding({ ...finding, compressibility: e.target.value as Compressibility })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium"
-                  >
-                    <option value="fully_compressible">Fully Compressible</option>
-                    <option value="partially_compressible">Partially Compressible</option>
-                    <option value="non_compressible">Non-Compressible</option>
-                    <option value="compression_not_possible">Compression Not Possible (Pain/Position)</option>
-                    <option value="not_applicable">Not Applicable</option>
-                  </select>
-                </div>
+                {/* Compressibility: Show for thigh, popliteal, calf_deep, muscular, superficial. Hide for pelvis */}
+                {finding.category !== 'pelvis' && (
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">Transducer Compressibility</label>
+                    <select
+                      value={finding.compressibility || 'non_compressible'}
+                      onChange={(e) => onSaveFinding({ ...finding, compressibility: e.target.value as Compressibility })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium"
+                    >
+                      <option value="fully_compressible">Fully Compressible</option>
+                      <option value="partially_compressible">Partially Compressible</option>
+                      <option value="non_compressible">Non-Compressible</option>
+                      <option value="compression_not_possible">Compression Not Possible (Pain/Position)</option>
+                      <option value="not_applicable">Not Applicable</option>
+                    </select>
+                  </div>
+                )}
 
+                {/* Lumen Patency / Occlusion */}
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Lumen Patency / Occlusion</label>
                   <select

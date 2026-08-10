@@ -95,5 +95,38 @@ export function runValidationChecks(state: ExamState): ValidationAlert[] {
     });
   }
 
+  // Check 7: Superficial thrombus within 20mm (2cm) of SFJ or SPJ (High Risk of Propagation)
+  ['right_GSV_PROX', 'left_GSV_PROX', 'right_SSV', 'left_SSV'].forEach((id) => {
+    const finding = state.vesselFindings[id];
+    if (finding && finding.status === 'abnormal' && finding.distanceToJunction?.distanceMm !== undefined && finding.distanceToJunction.distanceMm !== null) {
+      const dist = finding.distanceToJunction.distanceMm;
+      if (dist <= 20) {
+        alerts.push({
+          id: `alert-junction-proximity-${id}`,
+          severity: 'warning',
+          title: 'High-Risk Superficial Thrombus Near Deep Junction',
+          message: `${finding.vesselName}: Thrombus extends within ${dist} mm (≤ 2.0 cm) of ${finding.distanceToJunction.junction || 'deep junction'}. High clinical risk of propagation into deep venous system.`,
+          vesselId: id
+        });
+      }
+    }
+  });
+
+  // Check 8: Summary Text Contradiction Guard
+  if (state.generatedSummary) {
+    const summaryLower = state.generatedSummary.toLowerCase();
+    const allFindings = Object.values(state.vesselFindings);
+    const hasDeepDvt = allFindings.some(f => f.status === 'abnormal' && (f.category === 'thigh' || f.category === 'popliteal' || f.category === 'pelvis' || f.category === 'calf_deep' || f.category === 'muscular_calf'));
+    
+    if (hasDeepDvt && (summaryLower.includes('no deep venous thrombosis is identified') || summaryLower.includes('no dvt is identified'))) {
+      alerts.push({
+        id: 'alert-contradiction-dvt',
+        severity: 'warning',
+        title: 'CRITICAL REPORT CONTRADICTION',
+        message: 'Report summary contains "No deep venous thrombosis identified", but abnormal deep or calf vein thrombus is documented in the worksheet. Please regenerate or correct report text.'
+      });
+    }
+  }
+
   return alerts;
 }

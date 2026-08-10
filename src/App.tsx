@@ -23,6 +23,8 @@ import { PrintWorksheetView } from './components/PrintWorksheetView';
 
 import { LayoutGrid, GitBranch } from 'lucide-react';
 
+import { NormalConfirmationModal } from './components/NormalConfirmationModal';
+
 export const App: React.FC = () => {
   // Load draft from localStorage or default to Demo Case 1 (Normal)
   const [examState, setExamState] = useState<ExamState>(() => {
@@ -41,6 +43,7 @@ export const App: React.FC = () => {
   const [worksheetViewMode, setWorksheetViewMode] = useState<'matrix' | 'diagram'>('matrix');
   const [selectedVesselId, setSelectedVesselId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+  const [isNormalModalOpen, setIsNormalModalOpen] = useState<boolean>(false);
   const [copyNotification, setCopyNotification] = useState(false);
 
   const handleOpenDetailModal = (vesselId: string) => {
@@ -264,7 +267,7 @@ export const App: React.FC = () => {
         header={examState.header}
         onChangeHeader={(header) => setExamState({ ...examState, header })}
         onSelectDemoCase={handleSelectDemoCase}
-        onMarkAssessedNormal={handleMarkAssessedNormal}
+        onMarkAssessedNormal={() => setIsNormalModalOpen(true)}
         onSaveDraft={handleSaveDraft}
         onResetExam={handleResetExam}
         onPrintWorksheet={handlePrintWorksheet}
@@ -284,7 +287,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Workspace Body */}
-      <main className="flex-1 p-3 md:p-5 max-w-[1700px] w-full mx-auto space-y-4 no-print">
+      <main className="flex-1 p-3 md:p-5 max-w-[95%] w-full mx-auto space-y-4 no-print">
         {/* Tab 1: Interactive Worksheet & Anatomical Mapping */}
         {activeTab === 'worksheet' && (
           <div className="space-y-4">
@@ -460,6 +463,15 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Routine Normal Confirmation Modal */}
+      <NormalConfirmationModal
+        isOpen={isNormalModalOpen}
+        onClose={() => setIsNormalModalOpen(false)}
+        onConfirmRight={handleMarkRoutineRightNormal}
+        onConfirmLeft={handleMarkRoutineLeftNormal}
+        onConfirmBilateral={handleMarkRoutineBilateralNormal}
+      />
 
       {/* Print-only Worksheet Render */}
       <PrintWorksheetView state={examState} summaryText={examState.generatedSummary} />
