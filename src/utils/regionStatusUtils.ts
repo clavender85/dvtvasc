@@ -166,19 +166,28 @@ export function markRegionRoutineNormal(
     const f = next[vId];
     // Populate ONLY if currently unset / not_assessed
     if (f && f.status === 'not_assessed') {
+      let dopplerDefault = f.doppler;
+      if (vId.endsWith('_CFV')) {
+        dopplerDefault = { ...dopplerDefault, phasicity: 'phasic' };
+      } else if (vId.endsWith('_POPV')) {
+        dopplerDefault = { ...dopplerDefault, phasicity: 'phasic', augmentation: 'not_assessed' };
+      }
+
       if (region === 'iliocaval') {
         next[vId] = {
           ...f,
           status: 'normal',
           patency: 'patent',
-          compressibility: 'not_applicable' // Avoid inappropriate limb compression findings on pelvic veins
+          compressibility: 'not_applicable',
+          doppler: dopplerDefault
         };
       } else {
         next[vId] = {
           ...f,
           status: 'normal',
           compressibility: 'fully_compressible',
-          patency: 'patent'
+          patency: 'patent',
+          doppler: dopplerDefault
         };
       }
     }

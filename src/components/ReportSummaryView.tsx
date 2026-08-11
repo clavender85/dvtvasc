@@ -16,7 +16,9 @@ import {
   FileSearch,
   ArrowLeft,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  MousePointer
 } from 'lucide-react';
 
 interface ReportSummaryViewProps {

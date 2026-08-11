@@ -51,6 +51,7 @@ interface AnatomicalDiagramProps {
   onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
   onToggleReportPreview?: () => void;
+  onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
   comparisons?: Record<string, any>;
 }
 
@@ -178,6 +179,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   onBatchUpdateFindings,
   onOpenDetailModal,
   onToggleReportPreview,
+  onContextMenu,
   comparisons
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -750,6 +752,11 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           onSelectVessel(id);
           if (onOpenDetailModal) {
             onOpenDetailModal(id);
+          }
+        }}
+        onContextMenu={(e) => {
+          if (onContextMenu) {
+            onContextMenu(id, e);
           }
         }}
         onMouseEnter={() => setHoveredId(id)}

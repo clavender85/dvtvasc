@@ -1,7 +1,7 @@
 // Main Ultrasound Lower Limb DVT Clinical Worksheet App
 
 import React, { useState, useEffect } from 'react';
-import { ExamState, VesselFinding, VesselStatus, ValidationAlert } from './types/dvt';
+import { ExamState, VesselFinding, VesselStatus, ValidationAlert, PhasicityOption, AugmentationOption } from './types/dvt';
 import { createInitialVesselFindings, ROUTINE_VESSEL_KEYS } from './data/anatomyData';
 import { DEMO_CASES, DEMO_CASE_1_NORMAL } from './data/demoCases';
 import { generateSonographerSummary } from './utils/reportGenerator';
@@ -18,7 +18,6 @@ import { PelvicVesselTreeList } from './components/PelvicVesselTreeList';
 import { VesselDetailModal } from './components/VesselDetailModal';
 import { ClinicalHistorySection } from './components/ClinicalHistorySection';
 import { LimitationsSection } from './components/LimitationsSection';
-import { DopplerSection } from './components/DopplerSection';
 import { OtherFindingsSection } from './components/OtherFindingsSection';
 import { ComparisonSection } from './components/ComparisonSection';
 import { ReportSummaryView } from './components/ReportSummaryView';
@@ -28,11 +27,10 @@ import { getNormalizedScope, updateHeaderScope } from './utils/scopeUtils';
 
 import { ProximalExtensionPromptBanner } from './components/ProximalExtensionPromptBanner';
 import { SymptomSiteSection } from './components/SymptomSiteSection';
-import { ExamExtentSection } from './components/ExamExtentSection';
 import { ClinicalCommunicationSection } from './components/ClinicalCommunicationSection';
 import { AnatomicalVariantsSection } from './components/AnatomicalVariantsSection';
 
-import { LayoutGrid, GitBranch } from 'lucide-react';
+import { LayoutGrid, GitBranch, CheckCircle, AlertTriangle, EyeOff, Edit, CheckSquare, XCircle, MousePointer } from 'lucide-react';
 
 import { NormalConfirmationModal } from './components/NormalConfirmationModal';
 
@@ -57,6 +55,11 @@ export const App: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isNormalModalOpen, setIsNormalModalOpen] = useState<boolean>(false);
   const [copyNotification, setCopyNotification] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    vesselId: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const scope = getNormalizedScope(examState.header);
   const { rightLowerLimb, leftLowerLimb, iliocaval } = scope.regionsExamined;
@@ -106,6 +109,29 @@ export const App: React.FC = () => {
     setSelectedVesselId(vesselId);
     setIsDetailModalOpen(true);
   };
+
+  const handleContextMenu = (vesselId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      vesselId,
+      x: e.clientX,
+      y: e.clientY
+    });
+  };
+
+  // Close context menu on left-click or escape key
+  useEffect(() => {
+    const handleCloseMenu = () => setContextMenu(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('click', handleCloseMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Auto-generate summary text whenever findings update, unless manually edited by user
   useEffect(() => {
@@ -264,6 +290,32 @@ export const App: React.FC = () => {
     }));
   };
 
+  // Update vessel specific Doppler assessment
+  const handleUpdateVesselDoppler = (
+    vesselId: string,
+    dopplerData: { phasicity?: PhasicityOption; augmentation?: AugmentationOption }
+  ) => {
+    const target = examState.vesselFindings[vesselId];
+    if (!target) return;
+
+    const updatedFinding: VesselFinding = {
+      ...target,
+      doppler: {
+        ...target.doppler,
+        ...dopplerData
+      }
+    };
+
+    setExamState((prev) => ({
+      ...prev,
+      vesselFindings: {
+        ...prev.vesselFindings,
+        [vesselId]: updatedFinding
+      },
+      userSummaryEdited: false
+    }));
+  };
+
   // Batch update multiple vessel findings from diagram or tree
   const handleBatchUpdateVessels = (updatedFindingsMap: Record<string, VesselFinding>) => {
     setExamState((prev) => ({
@@ -319,7 +371,12 @@ export const App: React.FC = () => {
             {/* Persistent Abnormal Findings Summary Panel */}
             <AbnormalFindingsPanel
               vesselFindings={examState.vesselFindings}
+              selectedVesselId={selectedVesselId}
+              selectedVesselIds={selectedVesselIds}
               onSelectVessel={setSelectedVesselId}
+              onToggleSelectVessel={handleToggleSelectVessel}
+              onOpenDetailModal={handleOpenDetailModal}
+              onContextMenu={handleContextMenu}
             />
 
             {/* View Mode Toolbar Header */}
@@ -370,11 +427,23 @@ export const App: React.FC = () => {
                 <VesselMatrixView
                   vesselFindings={examState.vesselFindings}
                   selectedVesselId={selectedVesselId}
+                  selectedVesselIds={selectedVesselIds}
+                  doppler={examState.doppler}
+                  contralateralCFVAssessment={examState.contralateralCFVAssessment}
+                  isUnilateralStudy={!rightLowerLimb || !leftLowerLimb}
                   onSelectVessel={setSelectedVesselId}
+                  onToggleSelectVessel={handleToggleSelectVessel}
                   onUpdateStatus={handleUpdateVesselStatus}
                   onMarkRoutineRightNormal={handleMarkRoutineRightNormal}
                   onMarkRoutineLeftNormal={handleMarkRoutineLeftNormal}
                   onMarkRoutineBilateralNormal={handleMarkRoutineBilateralNormal}
+                  onOpenDetailModal={handleOpenDetailModal}
+                  onContextMenu={handleContextMenu}
+                  onChangeDoppler={(doppler) => setExamState((prev) => ({ ...prev, doppler }))}
+                  onChangeContralateralCFV={(cCFV) =>
+                    setExamState((prev) => ({ ...prev, contralateralCFVAssessment: cCFV }))
+                  }
+                  onUpdateVesselDoppler={handleUpdateVesselDoppler}
                 />
               ) : (
                 <div className="space-y-4">
@@ -387,9 +456,11 @@ export const App: React.FC = () => {
                         selectedVesselId={selectedVesselId}
                         selectedVesselIds={selectedVesselIds}
                         onSelectVessel={setSelectedVesselId}
+                        onToggleSelectVessel={handleToggleSelectVessel}
                         onUpdateStatus={handleUpdateVesselStatus}
                         onBatchUpdateFindings={handleBatchUpdateVessels}
                         onOpenDetailModal={handleOpenDetailModal}
+                        onContextMenu={handleContextMenu}
                       />
                     </div>
                     <div className="lg:col-span-8 h-[680px]">
@@ -402,6 +473,7 @@ export const App: React.FC = () => {
                         onQuickToggleStatus={handleUpdateVesselStatus}
                         onBatchUpdateFindings={handleBatchUpdateVessels}
                         onOpenDetailModal={handleOpenDetailModal}
+                        onContextMenu={handleContextMenu}
                       />
                     </div>
                   </div>
@@ -419,10 +491,16 @@ export const App: React.FC = () => {
                             includePelvic={iliocaval}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            doppler={examState.doppler}
                             onSelectVessel={setSelectedVesselId}
+                            onToggleSelectVessel={handleToggleSelectVessel}
                             onUpdateStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
+                            onChangeDoppler={(doppler) => setExamState((prev) => ({ ...prev, doppler }))}
+                            onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
                         <div className="lg:col-span-6 h-[680px]">
@@ -437,6 +515,7 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
                             onToggleReportPreview={() => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -449,10 +528,16 @@ export const App: React.FC = () => {
                             includePelvic={iliocaval}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            doppler={examState.doppler}
                             onSelectVessel={setSelectedVesselId}
+                            onToggleSelectVessel={handleToggleSelectVessel}
                             onUpdateStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
+                            onChangeDoppler={(doppler) => setExamState((prev) => ({ ...prev, doppler }))}
+                            onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
                       </>
@@ -467,10 +552,16 @@ export const App: React.FC = () => {
                             includePelvic={iliocaval}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            doppler={examState.doppler}
                             onSelectVessel={setSelectedVesselId}
+                            onToggleSelectVessel={handleToggleSelectVessel}
                             onUpdateStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
+                            onChangeDoppler={(doppler) => setExamState((prev) => ({ ...prev, doppler }))}
+                            onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
                         <div className="lg:col-span-8 h-[680px]">
@@ -485,6 +576,7 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
                             onToggleReportPreview={() => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -509,6 +601,7 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
                             onToggleReportPreview={() => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -521,10 +614,16 @@ export const App: React.FC = () => {
                             includePelvic={iliocaval}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            doppler={examState.doppler}
                             onSelectVessel={setSelectedVesselId}
+                            onToggleSelectVessel={handleToggleSelectVessel}
                             onUpdateStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onContextMenu={handleContextMenu}
+                            onChangeDoppler={(doppler) => setExamState((prev) => ({ ...prev, doppler }))}
+                            onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
                       </>
@@ -541,14 +640,6 @@ export const App: React.FC = () => {
               onChangeSymptomSite={(symptomSite) => setExamState({ ...examState, symptomSite })}
             />
 
-            {/* Requirement 5: Actual Examination Extent */}
-            <ExamExtentSection
-              examExtent={examState.examExtent}
-              regionsExamined={scope.regionsExamined}
-              studyType={scope.studyType}
-              onChangeExtent={(examExtent) => setExamState({ ...examState, examExtent })}
-            />
-
             {/* Collapsible Clinical Details Sections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ClinicalHistorySection
@@ -561,18 +652,6 @@ export const App: React.FC = () => {
                 onChangeLimitations={(limitations) => setExamState({ ...examState, limitations })}
               />
             </div>
-
-            {/* Requirement 1 & 3: Spectral Doppler & Contralateral CFV */}
-            <DopplerSection
-              doppler={examState.doppler}
-              regionsExamined={scope.regionsExamined}
-              contralateralCFVAssessment={examState.contralateralCFVAssessment}
-              hasPositiveDvt={hasPositiveDvt}
-              onChangeDoppler={(doppler) => setExamState({ ...examState, doppler })}
-              onChangeContralateralCFV={(cCFV) =>
-                setExamState({ ...examState, contralateralCFVAssessment: cCFV })
-              }
-            />
 
             {/* Requirement 8: Anatomical Variants & Duplicated Veins */}
             <AnatomicalVariantsSection
@@ -697,6 +776,121 @@ export const App: React.FC = () => {
         onConfirmLeft={handleMarkRoutineLeftNormal}
         onConfirmBilateral={handleMarkRoutineBilateralNormal}
       />
+
+      {/* Interactive Right-Click Context Menu */}
+      {contextMenu && (
+        <div
+          id="vessel-context-menu"
+          className="fixed z-50 bg-slate-950 border border-slate-800 text-slate-100 rounded-lg shadow-2xl py-1.5 w-64 text-xs font-sans animate-fadeIn"
+          style={{
+            top: `${contextMenu.y}px`,
+            left: `${contextMenu.x}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-3 py-1 border-b border-slate-800/80 mb-1 flex items-center justify-between text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+            <span>{examState.vesselFindings[contextMenu.vesselId]?.vesselName || 'Vessel Actions'}</span>
+            <span className="text-[9px] lowercase font-normal italic">right-click menu</span>
+          </div>
+
+          {/* Quick Status Modifiers */}
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+            onClick={() => {
+              handleUpdateVesselStatus(contextMenu.vesselId, 'normal');
+              setContextMenu(null);
+            }}
+          >
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Mark as <strong className="text-emerald-400">Normal</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+            onClick={() => {
+              handleUpdateVesselStatus(contextMenu.vesselId, 'abnormal');
+              handleOpenDetailModal(contextMenu.vesselId);
+              setContextMenu(null);
+            }}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+            <span>Mark as <strong className="text-rose-400">Abnormal</strong> (Edit Details)</span>
+          </button>
+
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+            onClick={() => {
+              handleUpdateVesselStatus(contextMenu.vesselId, 'not_visualised');
+              setContextMenu(null);
+            }}
+          >
+            <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+            <span>Mark as <strong className="text-amber-400">Not Visualised</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+            onClick={() => {
+              handleUpdateVesselStatus(contextMenu.vesselId, 'not_assessed');
+              setContextMenu(null);
+            }}
+          >
+            <XCircle className="w-3.5 h-3.5 text-slate-500" />
+            <span>Mark as <strong className="text-slate-400">Not Examined</strong></span>
+          </button>
+
+          <div className="h-[1px] bg-slate-800/60 my-1"></div>
+
+          {/* Selection Actions */}
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+            onClick={() => {
+              handleToggleSelectVessel(contextMenu.vesselId);
+              setContextMenu(null);
+            }}
+          >
+            <CheckSquare className="w-3.5 h-3.5 text-sky-400" />
+            <span>
+              {selectedVesselIds.includes(contextMenu.vesselId) ? 'Deselect' : 'Select'} Vessel
+            </span>
+          </button>
+
+          {selectedVesselIds.length > 0 && (
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors"
+              onClick={() => {
+                handleClearSelection();
+                setContextMenu(null);
+              }}
+            >
+              <MousePointer className="w-3.5 h-3.5 text-slate-400" />
+              <span>Clear Selection ({selectedVesselIds.length})</span>
+            </button>
+          )}
+
+          <div className="h-[1px] bg-slate-800/60 my-1"></div>
+
+          {/* Edit Details Trigger */}
+          <button
+            type="button"
+            className="w-full text-left px-3 py-2 hover:bg-slate-850 flex items-center gap-2 text-slate-200 transition-colors font-medium"
+            onClick={() => {
+              handleOpenDetailModal(contextMenu.vesselId);
+              setContextMenu(null);
+            }}
+          >
+            <Edit className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-teal-300">Open Detailed Findings Editor</span>
+          </button>
+        </div>
+      )}
 
       {/* Print-only Worksheet Render */}
       <PrintWorksheetView state={examState} summaryText={examState.generatedSummary} />

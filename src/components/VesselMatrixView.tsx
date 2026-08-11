@@ -1,17 +1,39 @@
 // Ultrasound DVT Examination Vessel Matrix View Component
 
 import React from 'react';
-import { VesselFinding, VesselStatus, Side, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
+import {
+  VesselFinding,
+  VesselStatus,
+  Side,
+  NON_VISUALIZATION_REASON_LABELS,
+  DopplerAssessment,
+  ContralateralCFVAssessment,
+  PhasicityOption,
+  AugmentationOption
+} from '../types/dvt';
 import { CheckCircle2, AlertTriangle, HelpCircle, Edit3, Zap, ShieldCheck, EyeOff } from 'lucide-react';
 
 interface VesselMatrixViewProps {
   vesselFindings: Record<string, VesselFinding>;
   selectedVesselId: string | null;
+  selectedVesselIds?: string[];
+  doppler?: DopplerAssessment;
+  contralateralCFVAssessment?: ContralateralCFVAssessment;
+  isUnilateralStudy?: boolean;
   onSelectVessel: (vesselId: string) => void;
+  onToggleSelectVessel?: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
   onMarkRoutineRightNormal: () => void;
   onMarkRoutineLeftNormal: () => void;
   onMarkRoutineBilateralNormal: () => void;
+  onOpenDetailModal?: (vesselId: string) => void;
+  onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
+  onChangeDoppler?: (updatedDoppler: DopplerAssessment) => void;
+  onChangeContralateralCFV?: (cCFV: ContralateralCFVAssessment) => void;
+  onUpdateVesselDoppler?: (
+    vesselId: string,
+    dopplerData: { phasicity?: PhasicityOption; augmentation?: AugmentationOption }
+  ) => void;
 }
 
 export interface MatrixRowConfig {
@@ -215,17 +237,22 @@ export const MATRIX_ROWS: MatrixRowConfig[] = [
 export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
   vesselFindings,
   selectedVesselId,
+  selectedVesselIds = [],
+  doppler,
+  contralateralCFVAssessment,
+  isUnilateralStudy = false,
   onSelectVessel,
+  onToggleSelectVessel,
   onUpdateStatus,
   onMarkRoutineRightNormal,
   onMarkRoutineLeftNormal,
-  onMarkRoutineBilateralNormal
+  onMarkRoutineBilateralNormal,
+  onOpenDetailModal,
+  onContextMenu,
+  onChangeDoppler,
+  onChangeContralateralCFV,
+  onUpdateVesselDoppler
 }) => {
-  const handleAbnormalClick = (vesselId: string) => {
-    // Set status to abnormal AND open detail edit modal in one smooth click
-    onUpdateStatus(vesselId, 'abnormal');
-    onSelectVessel(vesselId);
-  };
 
   const getCategoryBadge = (category: MatrixRowConfig['category']) => {
     switch (category) {
@@ -256,20 +283,44 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
       );
     }
 
-    const isSelected = selectedVesselId === vesselId;
+    const isSelected = selectedVesselId === vesselId || (selectedVesselIds && selectedVesselIds.includes(vesselId));
     const status = finding.status;
 
     return (
       <td
-        className={`p-2 border-b border-slate-800 transition-colors ${
+        className={`p-2 border-b border-slate-800 transition-colors cursor-pointer ${
           status === 'abnormal'
             ? 'bg-rose-950/40'
             : status === 'normal'
             ? 'bg-slate-900/40'
             : 'bg-slate-950/50'
-        } ${isSelected ? 'ring-2 ring-teal-500 inset-0' : ''}`}
+        } ${isSelected ? 'ring-2 ring-teal-500 inset-0 z-10 relative' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onToggleSelectVessel) {
+            onToggleSelectVessel(vesselId);
+          } else {
+            onSelectVessel(vesselId);
+          }
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (onToggleSelectVessel && !isSelected) {
+            onToggleSelectVessel(vesselId);
+          } else {
+            onSelectVessel(vesselId);
+          }
+          if (onOpenDetailModal) {
+            onOpenDetailModal(vesselId);
+          }
+        }}
+        onContextMenu={(e) => {
+          if (onContextMenu) {
+            onContextMenu(vesselId, e);
+          }
+        }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 select-none">
           {/* Status Indicator Pill */}
           <div className="flex items-center gap-1.5 min-w-0">
             {status === 'normal' && (
@@ -308,10 +359,17 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
           </div>
 
           {/* Quick Action Toggle Buttons */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => onUpdateStatus(vesselId, 'normal')}
+              onClick={() => {
+                onUpdateStatus(vesselId, 'normal');
+                if (onToggleSelectVessel && !isSelected) {
+                  onToggleSelectVessel(vesselId);
+                } else {
+                  onSelectVessel(vesselId);
+                }
+              }}
               className={`px-2 py-1 rounded text-[11px] font-bold transition-all ${
                 status === 'normal'
                   ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
@@ -324,20 +382,34 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
 
             <button
               type="button"
-              onClick={() => handleAbnormalClick(vesselId)}
+              onClick={() => {
+                onUpdateStatus(vesselId, 'abnormal');
+                if (onToggleSelectVessel && !isSelected) {
+                  onToggleSelectVessel(vesselId);
+                } else {
+                  onSelectVessel(vesselId);
+                }
+              }}
               className={`px-2 py-1 rounded text-[11px] font-bold transition-all ${
                 status === 'abnormal'
                   ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-400'
                   : 'bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-300 border border-slate-700'
               }`}
-              title="Click to mark Abnormal & open detailed thrombus editor"
+              title="Click to mark Abnormal"
             >
               Abnormal
             </button>
 
             <button
               type="button"
-              onClick={() => onUpdateStatus(vesselId, 'not_visualised')}
+              onClick={() => {
+                onUpdateStatus(vesselId, 'not_visualised');
+                if (onToggleSelectVessel && !isSelected) {
+                  onToggleSelectVessel(vesselId);
+                } else {
+                  onSelectVessel(vesselId);
+                }
+              }}
               className={`px-1.5 py-1 rounded text-[10px] font-semibold transition-all ${
                 status === 'not_visualised'
                   ? 'bg-amber-800 text-amber-100 border border-amber-600'
@@ -350,7 +422,16 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
 
             <button
               type="button"
-              onClick={() => onSelectVessel(vesselId)}
+              onClick={() => {
+                if (onToggleSelectVessel && !isSelected) {
+                  onToggleSelectVessel(vesselId);
+                } else {
+                  onSelectVessel(vesselId);
+                }
+                if (onOpenDetailModal) {
+                  onOpenDetailModal(vesselId);
+                }
+              }}
               className={`p-1 rounded text-slate-400 hover:text-teal-300 hover:bg-slate-800 transition-colors ${
                 status === 'abnormal' ? 'text-rose-300' : ''
               }`}
@@ -360,6 +441,118 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Integrated Doppler Controls for Matrix Cells */}
+        {vesselId.endsWith('_CFV') && (() => {
+          const isRight = vesselId.startsWith('right_');
+          const cfvPhasicity =
+            finding.doppler?.phasicity ||
+            (isRight ? doppler?.rightCFVPhasicity : doppler?.leftCFVPhasicity) ||
+            'phasic';
+
+          return (
+            <div
+              className="mt-1.5 pt-1 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-300 w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-slate-400 font-medium">Phasicity:</span>
+              <select
+                value={cfvPhasicity}
+                onChange={(e) => {
+                  const val = e.target.value as PhasicityOption;
+                  if (onUpdateVesselDoppler) onUpdateVesselDoppler(vesselId, { phasicity: val });
+                  if (doppler && onChangeDoppler) {
+                    onChangeDoppler({
+                      ...doppler,
+                      [isRight ? 'rightCFVPhasicity' : 'leftCFVPhasicity']: val
+                    });
+                  }
+                }}
+                className="bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5 text-teal-300 font-medium focus:outline-none"
+              >
+                <option value="phasic">Phasic / normal</option>
+                <option value="reduced_phasicity">Reduced phasicity</option>
+                <option value="continuous_non_phasic">Continuous / non-phasic</option>
+                <option value="pulsatile">Pulsatile</option>
+                <option value="absent_flow">Absent flow</option>
+                <option value="not_assessed">Not assessed</option>
+                <option value="not_visualised">Not visualised</option>
+              </select>
+            </div>
+          );
+        })()}
+
+        {vesselId.endsWith('_POPV') && (() => {
+          const isRight = vesselId.startsWith('right_');
+          const popFlow =
+            finding.doppler?.phasicity ||
+            (isRight ? doppler?.rightPopPhasicity : doppler?.leftPopPhasicity) ||
+            'phasic';
+
+          const popAug =
+            finding.doppler?.augmentation ||
+            (isRight ? doppler?.rightAugmentation : doppler?.leftAugmentation) ||
+            'not_assessed';
+
+          return (
+            <div
+              className="mt-1.5 pt-1 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-300 w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-slate-400 font-medium">Flow:</span>
+                <select
+                  value={popFlow}
+                  onChange={(e) => {
+                    const val = e.target.value as PhasicityOption;
+                    if (onUpdateVesselDoppler) onUpdateVesselDoppler(vesselId, { phasicity: val, augmentation: popAug });
+                    if (doppler && onChangeDoppler) {
+                      onChangeDoppler({
+                        ...doppler,
+                        [isRight ? 'rightPopPhasicity' : 'leftPopPhasicity']: val
+                      });
+                    }
+                  }}
+                  className="bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5 text-teal-300 font-medium focus:outline-none"
+                >
+                  <option value="phasic">Phasic / normal</option>
+                  <option value="reduced_phasicity">Reduced phasicity</option>
+                  <option value="continuous_non_phasic">Continuous / non-phasic</option>
+                  <option value="pulsatile">Pulsatile</option>
+                  <option value="absent_flow">Absent flow</option>
+                  <option value="not_assessed">Not assessed</option>
+                  <option value="not_visualised">Not visualised</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="text-slate-400 font-medium">Aug:</span>
+                <select
+                  value={popAug}
+                  onChange={(e) => {
+                    const val = e.target.value as AugmentationOption;
+                    if (onUpdateVesselDoppler) onUpdateVesselDoppler(vesselId, { phasicity: popFlow, augmentation: val });
+                    if (doppler && onChangeDoppler) {
+                      onChangeDoppler({
+                        ...doppler,
+                        [isRight ? 'rightAugmentation' : 'leftAugmentation']: val
+                      });
+                    }
+                  }}
+                  className="bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5 text-teal-300 font-medium focus:outline-none"
+                >
+                  <option value="normal_augmentation">Normal augmentation</option>
+                  <option value="reduced_augmentation">Reduced augmentation</option>
+                  <option value="absent_augmentation">Absent augmentation</option>
+                  <option value="performed_prior_to_dvt">Performed before DVT identified</option>
+                  <option value="not_performed_positive_dvt">Not performed due to positive DVT</option>
+                  <option value="not_performed">Not performed</option>
+                  <option value="not_assessed">Not assessed</option>
+                </select>
+              </div>
+            </div>
+          );
+        })()}
       </td>
     );
   };
@@ -491,7 +684,13 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAbnormalClick(row.centralKey!)}
+                            onClick={() => {
+                              onUpdateStatus(row.centralKey!, 'abnormal');
+                              onSelectVessel(row.centralKey!);
+                              if (onOpenDetailModal) {
+                                onOpenDetailModal(row.centralKey!);
+                              }
+                            }}
                             className={`px-2.5 py-1 rounded text-xs font-bold ${
                               status === 'abnormal' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                             }`}

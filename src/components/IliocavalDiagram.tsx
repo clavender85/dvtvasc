@@ -19,6 +19,7 @@ interface IliocavalDiagramProps {
   onClearSelection?: () => void;
   onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
+  onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
   filterPresent?: boolean;
   stentPresent?: boolean;
   isLowerLimbIncluded?: { right: boolean; left: boolean };
@@ -32,6 +33,7 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
   onClearSelection,
   onBatchUpdateFindings,
   onOpenDetailModal,
+  onContextMenu,
   filterPresent = false,
   stentPresent = false,
   isLowerLimbIncluded = { right: true, left: true }
@@ -281,6 +283,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 {/* Click target hit area */}
                 <path d="M 300 40 L 300 150" stroke="transparent" strokeWidth="40" strokeLinecap="round" />
@@ -346,6 +353,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 300 150 Q 250 200 200 250" stroke="transparent" strokeWidth="36" strokeLinecap="round" />
                 {isSel && (
@@ -395,6 +407,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 300 150 Q 350 200 400 250" stroke="transparent" strokeWidth="36" strokeLinecap="round" />
                 {isSel && (
@@ -444,6 +461,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 200 250 Q 230 300 250 340" stroke="transparent" strokeWidth="30" strokeLinecap="round" />
                 {isSel && (
@@ -492,6 +514,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 400 250 Q 370 300 350 340" stroke="transparent" strokeWidth="30" strokeLinecap="round" />
                 {isSel && (
@@ -540,6 +567,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 200 250 Q 170 310 150 380" stroke="transparent" strokeWidth="32" strokeLinecap="round" />
                 {isSel && (
@@ -589,6 +621,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 400 250 Q 430 310 450 380" stroke="transparent" strokeWidth="32" strokeLinecap="round" />
                 {isSel && (
@@ -640,6 +677,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => isIncluded && handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (isIncluded && onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 150 380 L 150 480" stroke="transparent" strokeWidth="32" strokeLinecap="round" />
                 {isSel && (
@@ -690,6 +732,11 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                 onMouseEnter={() => setHoveredId(vId)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => isIncluded && handleVesselClick(vId, e)}
+                onContextMenu={(e) => {
+                  if (isIncluded && onContextMenu) {
+                    onContextMenu(vId, e);
+                  }
+                }}
               >
                 <path d="M 450 380 L 450 480" stroke="transparent" strokeWidth="32" strokeLinecap="round" />
                 {isSel && (

@@ -34,9 +34,9 @@ const baseExamState: ExamState = {
     leftCFVPhasicity: 'phasic',
     rightPopPhasicity: 'phasic',
     leftPopPhasicity: 'phasic',
-    rightAugmentation: 'normal_augmentation',
-    leftAugmentation: 'normal_augmentation',
-    dopplerComments: 'Spontaneous phasic flow with good manual distal augmentation bilaterally.'
+    rightAugmentation: 'not_assessed',
+    leftAugmentation: 'not_assessed',
+    dopplerComments: 'Spontaneous phasic flow at CFV and Popliteal veins.'
   },
   pelvic: {
     ivcVisualised: 'visualised',

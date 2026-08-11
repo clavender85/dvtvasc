@@ -163,9 +163,25 @@ export interface VesselFinding {
   continuousWithVesselIds?: string[];
   locationDetails?: string;
   comments?: string;
+
+  // Vessel Doppler (integrated CFV phasicity / Popliteal flow & augmentation)
+  doppler?: VesselDoppler;
 }
 
-export type PhasicityOption = 'phasic' | 'reduced_phasicity' | 'continuous_non_phasic' | 'pulsatile' | 'not_assessed';
+export interface VesselDoppler {
+  phasicity?: PhasicityOption;
+  augmentation?: AugmentationOption;
+}
+
+export type PhasicityOption =
+  | 'phasic'
+  | 'reduced_phasicity'
+  | 'continuous_non_phasic'
+  | 'pulsatile'
+  | 'absent_flow'
+  | 'not_assessed'
+  | 'not_visualised';
+
 export type AugmentationOption =
   | 'normal_augmentation'
   | 'reduced_augmentation'
@@ -514,6 +530,9 @@ export interface ValidationAlert {
   title: string;
   message: string;
   vesselId?: string;
+  actionVesselId?: string;
+  region?: string;
+  dismissable?: boolean;
 }
 
 export interface ReportBlock {

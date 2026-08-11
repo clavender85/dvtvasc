@@ -110,15 +110,6 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
     if (ss.comments) sStr += `. ${ss.comments}`;
     examLines.push(sStr);
   }
-  if (state.examExtent) {
-    const ext = state.examExtent;
-    if (ext.right) {
-      examLines.push(`RIGHT ANATOMICAL EXTENT: Examined from ${ext.right.upperExtent} to ${ext.right.lowerExtent}.`);
-    }
-    if (ext.left) {
-      examLines.push(`LEFT ANATOMICAL EXTENT: Examined from ${ext.left.upperExtent} to ${ext.left.lowerExtent}.`);
-    }
-  }
 
   blocks.push({
     id: 'block-exam-details',
@@ -353,11 +344,49 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
     }
 
     // Spectral Doppler
-    const cfvPhasicity = side === 'right' ? doppler.rightCFVPhasicity : doppler.leftCFVPhasicity;
-    const popPhasicity = side === 'right' ? doppler.rightPopPhasicity : doppler.leftPopPhasicity;
-    const aug = side === 'right' ? doppler.rightAugmentation : doppler.leftAugmentation;
+    const cfvFinding = state.vesselFindings[`${side}_CFV`];
+    const popFinding = state.vesselFindings[`${side}_POPV`];
 
-    const dopplerText = `Spectral Doppler: Respiratory phasicity at Common Femoral Vein is ${cfvPhasicity.replace(/_/g, ' ')}. Popliteal vein flow is ${popPhasicity.replace(/_/g, ' ')}. Distal augmentation: ${aug.replace(/_/g, ' ')}.`;
+    const cfvPhasicity =
+      cfvFinding?.doppler?.phasicity ||
+      (side === 'right' ? doppler.rightCFVPhasicity : doppler.leftCFVPhasicity) ||
+      'phasic';
+
+    const popPhasicity =
+      popFinding?.doppler?.phasicity ||
+      (side === 'right' ? doppler.rightPopPhasicity : doppler.leftPopPhasicity) ||
+      'phasic';
+
+    const aug =
+      popFinding?.doppler?.augmentation ||
+      (side === 'right' ? doppler.rightAugmentation : doppler.leftAugmentation) ||
+      'not_assessed';
+
+    const formatPhasicityText = (p: string) => {
+      if (p === 'phasic') return 'phasic';
+      if (p === 'reduced_phasicity') return 'reduced';
+      if (p === 'continuous_non_phasic') return 'continuous (non-phasic)';
+      if (p === 'pulsatile') return 'pulsatile';
+      if (p === 'absent_flow') return 'absent';
+      if (p === 'not_visualised') return 'not visualised';
+      if (p === 'not_assessed') return 'not assessed';
+      return p.replace(/_/g, ' ');
+    };
+
+    const formatAugText = (a: string) => {
+      if (a === 'normal_augmentation') return 'normal distal augmentation';
+      if (a === 'reduced_augmentation') return 'reduced distal augmentation';
+      if (a === 'absent_augmentation') return 'absent distal augmentation';
+      if (a === 'performed_prior_to_dvt') return 'distal augmentation performed prior to DVT identification';
+      if (a === 'not_performed_positive_dvt') return 'distal augmentation not performed due to positive DVT';
+      if (a === 'not_performed') return 'distal augmentation not performed';
+      if (a === 'not_assessed') return 'distal augmentation not assessed';
+      return a.replace(/_/g, ' ');
+    };
+
+    const dopplerText = `Spectral Doppler: Common femoral vein flow is ${formatPhasicityText(
+      cfvPhasicity
+    )}. Popliteal vein flow is ${formatPhasicityText(popPhasicity)} with ${formatAugText(aug)}.`;
 
     blocks.push({
       id: `block-${side}-doppler`,

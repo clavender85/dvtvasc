@@ -6,12 +6,22 @@ import { AlertTriangle, Edit3, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 interface AbnormalFindingsPanelProps {
   vesselFindings: Record<string, VesselFinding>;
+  selectedVesselId?: string | null;
+  selectedVesselIds?: string[];
   onSelectVessel: (vesselId: string) => void;
+  onToggleSelectVessel?: (vesselId: string) => void;
+  onOpenDetailModal?: (vesselId: string) => void;
+  onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
 }
 
 export const AbnormalFindingsPanel: React.FC<AbnormalFindingsPanelProps> = ({
   vesselFindings,
-  onSelectVessel
+  selectedVesselId,
+  selectedVesselIds = [],
+  onSelectVessel,
+  onToggleSelectVessel,
+  onOpenDetailModal,
+  onContextMenu
 }) => {
   const abnormalList = (Object.values(vesselFindings) as VesselFinding[]).filter(
     (f) => f.status === 'abnormal'
@@ -107,24 +117,70 @@ export const AbnormalFindingsPanel: React.FC<AbnormalFindingsPanelProps> = ({
                 PELVIC / IVC PATHOLOGY ({pelvisAbnormals.length})
               </span>
               <div className="space-y-1.5">
-                {pelvisAbnormals.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => onSelectVessel(f.id)}
-                    className="w-full text-left p-2 bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600 rounded flex items-start justify-between gap-2 transition-all group"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-rose-300 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
-                        {f.vesselName}
+                {pelvisAbnormals.map((f) => {
+                  const isSelected = selectedVesselId === f.id || selectedVesselIds.includes(f.id);
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel && !isSelected) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                        if (onOpenDetailModal) {
+                          onOpenDetailModal(f.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (onContextMenu) {
+                          onContextMenu(f.id, e);
+                        }
+                      }}
+                      className={`w-full text-left p-2 rounded flex items-start justify-between gap-2 transition-all group cursor-pointer ${
+                        isSelected
+                          ? 'bg-rose-950/70 border-2 border-teal-500'
+                          : 'bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600'
+                      }`}
+                    >
+                      <div className="space-y-0.5 select-none">
+                        <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                          {f.vesselName}
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-tight capitalize">
+                          {formatFindingSummary(f)}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-tight capitalize">
-                        {formatFindingSummary(f)}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(f.id);
+                          } else {
+                            onSelectVessel(f.id);
+                          }
+                          if (onOpenDetailModal) {
+                            onOpenDetailModal(f.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-300 rounded bg-slate-900"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-300 flex-shrink-0 mt-0.5" />
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -136,24 +192,70 @@ export const AbnormalFindingsPanel: React.FC<AbnormalFindingsPanelProps> = ({
                 RIGHT LIMB PATHOLOGY ({rightAbnormals.length})
               </span>
               <div className="space-y-1.5">
-                {rightAbnormals.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => onSelectVessel(f.id)}
-                    className="w-full text-left p-2 bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600 rounded flex items-start justify-between gap-2 transition-all group"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-rose-300 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
-                        {f.vesselName}
+                {rightAbnormals.map((f) => {
+                  const isSelected = selectedVesselId === f.id || selectedVesselIds.includes(f.id);
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel && !isSelected) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                        if (onOpenDetailModal) {
+                          onOpenDetailModal(f.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (onContextMenu) {
+                          onContextMenu(f.id, e);
+                        }
+                      }}
+                      className={`w-full text-left p-2 rounded flex items-start justify-between gap-2 transition-all group cursor-pointer ${
+                        isSelected
+                          ? 'bg-rose-950/70 border-2 border-teal-500'
+                          : 'bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600'
+                      }`}
+                    >
+                      <div className="space-y-0.5 select-none">
+                        <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                          {f.vesselName}
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-tight capitalize">
+                          {formatFindingSummary(f)}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-tight capitalize">
-                        {formatFindingSummary(f)}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(f.id);
+                          } else {
+                            onSelectVessel(f.id);
+                          }
+                          if (onOpenDetailModal) {
+                            onOpenDetailModal(f.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-300 rounded bg-slate-900"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-300 flex-shrink-0 mt-0.5" />
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -165,24 +267,70 @@ export const AbnormalFindingsPanel: React.FC<AbnormalFindingsPanelProps> = ({
                 LEFT LIMB PATHOLOGY ({leftAbnormals.length})
               </span>
               <div className="space-y-1.5">
-                {leftAbnormals.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => onSelectVessel(f.id)}
-                    className="w-full text-left p-2 bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600 rounded flex items-start justify-between gap-2 transition-all group"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-rose-300 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
-                        {f.vesselName}
+                {leftAbnormals.map((f) => {
+                  const isSelected = selectedVesselId === f.id || selectedVesselIds.includes(f.id);
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleSelectVessel && !isSelected) {
+                          onToggleSelectVessel(f.id);
+                        } else {
+                          onSelectVessel(f.id);
+                        }
+                        if (onOpenDetailModal) {
+                          onOpenDetailModal(f.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (onContextMenu) {
+                          onContextMenu(f.id, e);
+                        }
+                      }}
+                      className={`w-full text-left p-2 rounded flex items-start justify-between gap-2 transition-all group cursor-pointer ${
+                        isSelected
+                          ? 'bg-rose-950/70 border-2 border-teal-500'
+                          : 'bg-slate-950 hover:bg-rose-950/40 border border-rose-800/50 hover:border-rose-600'
+                      }`}
+                    >
+                      <div className="space-y-0.5 select-none">
+                        <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                          {f.vesselName}
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-tight capitalize">
+                          {formatFindingSummary(f)}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-tight capitalize">
-                        {formatFindingSummary(f)}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(f.id);
+                          } else {
+                            onSelectVessel(f.id);
+                          }
+                          if (onOpenDetailModal) {
+                            onOpenDetailModal(f.id);
+                          }
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-300 rounded bg-slate-900"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-300 flex-shrink-0 mt-0.5" />
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

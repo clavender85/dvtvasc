@@ -12,8 +12,8 @@ export function runValidationChecks(state: ExamState): ValidationAlert[] {
   // ==========================================
 
   // Error 1: Report text vs Worksheet DVT Contradiction
-  if (state.generatedSummary || state.summaryText) {
-    const summaryLower = (state.generatedSummary || state.summaryText || '').toLowerCase();
+  if (state.generatedSummary) {
+    const summaryLower = (state.generatedSummary || '').toLowerCase();
     const allFindings = Object.values(state.vesselFindings);
     const hasDeepDvt = allFindings.some(
       (f) => f.status === 'abnormal' && (f.category === 'thigh' || f.category === 'popliteal' || f.category === 'pelvis' || f.category === 'calf_deep' || f.category === 'muscular_calf')

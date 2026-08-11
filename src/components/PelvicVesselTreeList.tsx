@@ -9,9 +9,11 @@ interface PelvicVesselTreeListProps {
   selectedVesselId: string | null;
   selectedVesselIds?: string[];
   onSelectVessel: (vesselId: string) => void;
+  onToggleSelectVessel?: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
   onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
+  onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
 }
 
 interface PelvicGroup {
@@ -57,9 +59,11 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
   selectedVesselId,
   selectedVesselIds = [],
   onSelectVessel,
+  onToggleSelectVessel,
   onUpdateStatus,
   onBatchUpdateFindings,
-  onOpenDetailModal
+  onOpenDetailModal,
+  onContextMenu
 }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col h-full">
@@ -99,19 +103,46 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                 return (
                   <div
                     key={vesselId}
-                    className={`p-2 transition-colors flex items-center justify-between gap-2 ${
+                    className={`p-2 transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                       isSelected
                         ? 'bg-slate-800/90 border-l-4 border-amber-500'
                         : finding.status === 'abnormal'
                         ? 'bg-rose-950/30'
                         : 'hover:bg-slate-900/80'
                     }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onToggleSelectVessel) {
+                        onToggleSelectVessel(vesselId);
+                      } else {
+                        onSelectVessel(vesselId);
+                      }
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedVesselIds && selectedVesselIds.length > 1 && selectedVesselIds.includes(vesselId)) {
+                        if (onOpenDetailModal) {
+                          onOpenDetailModal(vesselId);
+                        }
+                      } else {
+                        if (onToggleSelectVessel && !isSelected) {
+                          onToggleSelectVessel(vesselId);
+                        } else {
+                          onSelectVessel(vesselId);
+                        }
+                        if (onOpenDetailModal) {
+                          onOpenDetailModal(vesselId);
+                        }
+                      }
+                    }}
+                    onContextMenu={(e) => {
+                      if (onContextMenu) {
+                        onContextMenu(vesselId, e);
+                      }
+                    }}
                   >
                     {/* Vessel Info & Quick Status Icon */}
-                    <div
-                      className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => onSelectVessel(vesselId)}
-                    >
+                    <div className="flex items-center gap-2 flex-1 min-w-0 select-none">
                       {finding.status === 'normal' && (
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                       )}
@@ -152,10 +183,17 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                     </div>
 
                     {/* Status Toggle Pills */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={() => onUpdateStatus(vesselId, 'normal')}
+                        onClick={() => {
+                          onUpdateStatus(vesselId, 'normal');
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(vesselId);
+                          } else {
+                            onSelectVessel(vesselId);
+                          }
+                        }}
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
                           finding.status === 'normal'
                             ? 'bg-emerald-700 text-white'
@@ -169,12 +207,11 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          if (finding.status !== 'abnormal') {
-                            onUpdateStatus(vesselId, 'abnormal');
-                          }
-                          onSelectVessel(vesselId);
-                          if (onOpenDetailModal) {
-                            onOpenDetailModal(vesselId);
+                          onUpdateStatus(vesselId, 'abnormal');
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(vesselId);
+                          } else {
+                            onSelectVessel(vesselId);
                           }
                         }}
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
@@ -182,7 +219,7 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                             ? 'bg-rose-600 text-white'
                             : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                         }`}
-                        title="Mark Abnormal & Describe Thrombus"
+                        title="Mark Abnormal"
                       >
                         Abn
                       </button>
@@ -190,12 +227,11 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          if (finding.status !== 'not_visualised') {
-                            onUpdateStatus(vesselId, 'not_visualised');
-                          }
-                          onSelectVessel(vesselId);
-                          if (onOpenDetailModal) {
-                            onOpenDetailModal(vesselId);
+                          onUpdateStatus(vesselId, 'not_visualised');
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(vesselId);
+                          } else {
+                            onSelectVessel(vesselId);
                           }
                         }}
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
@@ -203,14 +239,23 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
                             ? 'bg-amber-800 text-amber-100 ring-1 ring-amber-500'
                             : 'bg-slate-800 text-slate-500 hover:text-slate-300'
                         }`}
-                        title="Not Visualised (Click to select reason)"
+                        title="Not Visualised"
                       >
                         N/V
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => onSelectVessel(vesselId)}
+                        onClick={() => {
+                          if (onToggleSelectVessel && !isSelected) {
+                            onToggleSelectVessel(vesselId);
+                          } else {
+                            onSelectVessel(vesselId);
+                          }
+                          if (onOpenDetailModal) {
+                            onOpenDetailModal(vesselId);
+                          }
+                        }}
                         className="p-1 text-slate-400 hover:text-amber-300"
                         title="Edit Detailed Vessel Card"
                       >
