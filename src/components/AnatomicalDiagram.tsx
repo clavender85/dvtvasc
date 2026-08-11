@@ -12,9 +12,11 @@ import {
   SonographicChronicity,
   ThrombusEchogenicity,
   NON_VISUALIZATION_REASON_LABELS,
-  SSVVariantState
+  SSVVariantState,
+  ExamState
 } from '../types/dvt';
 import { LANDMARK_LABELS } from '../data/anatomyData';
+import { generateKeyImpression } from '../utils/reportGenerator';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -37,10 +39,12 @@ import {
   Sparkles,
   MapPin,
   FileText,
-  MousePointer
+  MousePointer,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface AnatomicalDiagramProps {
+  state?: ExamState;
   vesselFindings: Record<string, VesselFinding>;
   selectedVesselId: string | null;
   selectedVesselIds?: string[];
@@ -56,6 +60,7 @@ interface AnatomicalDiagramProps {
   onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
   onToggleReportPreview?: () => void;
+  onOpenFullReport?: () => void;
   onContextMenu?: (vesselId: string, e: React.MouseEvent) => void;
   comparisons?: Record<string, any>;
 }
@@ -178,6 +183,7 @@ const LANDMARK_Y = {
 export type MapViewMode = 'all' | 'normal' | 'abnormal_context' | 'abnormal_only' | 'selected';
 
 export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
+  state,
   vesselFindings,
   selectedVesselId,
   selectedVesselIds: propsSelectedVesselIds,
@@ -190,6 +196,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   onBatchUpdateFindings,
   onOpenDetailModal,
   onToggleReportPreview,
+  onOpenFullReport,
   onContextMenu,
   comparisons
 }) => {
@@ -201,6 +208,28 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   const [mapViewMode, setMapViewMode] = useState<MapViewMode>('all');
   const [limbFocus, setLimbFocus] = useState<'bilateral' | 'right' | 'left'>('bilateral');
   const [regionFocus, setRegionFocus] = useState<'full' | 'thigh' | 'popliteal' | 'calf'>('full');
+
+  // Compute live key impression directly from central exam state
+  const impressionData = React.useMemo(() => {
+    if (state) {
+      return generateKeyImpression(state);
+    }
+    const dummyState: any = {
+      header: { examScope: 'bilateral' },
+      vesselFindings,
+      limitations: { hasLimitations: false, factors: [] },
+      otherFindings: [],
+      pelvic: { ivcStatus: 'normal', civRightStatus: 'normal', civLeftStatus: 'normal' }
+    };
+    return generateKeyImpression(dummyState);
+  }, [state, vesselFindings]);
+
+  const hasKeyImpressionPathology = React.useMemo(() => {
+    return Object.values(vesselFindings || {}).some((f) => {
+      const vf = f as VesselFinding;
+      return vf.status === 'abnormal' || vf.thrombusPresence === 'thrombus_present';
+    });
+  }, [vesselFindings]);
 
   const abnormalVesselCount = Object.values(vesselFindings).filter(
     (f) => (f as VesselFinding)?.status === 'abnormal'
@@ -2325,6 +2354,60 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             lumenType="none_faint"
           />
         </div>
+      </div>
+    </div>
+
+    {/* KEY IMPRESSION SECTION DIRECTLY BELOW ANATOMICAL MAP */}
+    <div
+      id="anatomical-map-key-impression"
+      className="mt-3 bg-slate-950/95 border border-slate-800 rounded-xl p-3 px-4 text-xs font-sans shadow-xl flex flex-col justify-center min-h-[72px]"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-teal-400 flex-shrink-0" />
+          <span className="font-bold text-xs text-teal-400 uppercase tracking-wider">
+            KEY IMPRESSION
+          </span>
+        </div>
+        {onOpenFullReport && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenFullReport();
+            }}
+            className="text-[11px] font-bold text-slate-400 hover:text-teal-300 flex items-center gap-1 transition-colors px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-teal-800/80 shadow-sm"
+            title="Open full Report page for complete report details and sign-off"
+          >
+            <span>Open Full Report</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-teal-400" />
+          </button>
+        )}
+      </div>
+
+      {/* Live Interactive Key Impression String */}
+      <div
+        onClick={() => {
+          if (impressionData.sourceVesselIds && impressionData.sourceVesselIds.length > 0) {
+            if (impressionData.sourceVesselIds.length > 1 && onSelectGroup) {
+              onSelectGroup(impressionData.sourceVesselIds);
+            } else if (onSelectVessel) {
+              onSelectVessel(impressionData.sourceVesselIds[0]);
+            }
+          }
+        }}
+        className={`text-xs sm:text-sm font-semibold leading-relaxed transition-all cursor-pointer rounded-lg p-1.5 -mx-1.5 ${
+          hasKeyImpressionPathology
+            ? 'text-amber-300 hover:bg-amber-950/40 hover:ring-1 hover:ring-amber-800/60'
+            : 'text-slate-200 hover:bg-slate-900/80'
+        }`}
+        title={
+          impressionData.sourceVesselIds && impressionData.sourceVesselIds.length > 0
+            ? 'Click to highlight abnormal source vessels on the anatomical map'
+            : undefined
+        }
+      >
+        "{impressionData.text}"
       </div>
     </div>
   </div>

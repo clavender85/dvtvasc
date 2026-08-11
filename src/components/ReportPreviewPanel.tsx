@@ -432,39 +432,6 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
                 );
               })}
             </div>
-
-            {/* Optional Key Impression Line */}
-            {conciseData.keyImpression && (
-              <div
-                onClick={() => {
-                  if (conciseData.impressionVesselIds && conciseData.impressionVesselIds.length > 0) {
-                    if (conciseData.impressionVesselIds.length > 1 && onSelectGroup) {
-                      onSelectGroup(conciseData.impressionVesselIds);
-                    } else {
-                      onSelectVessel(conciseData.impressionVesselIds[0]);
-                    }
-                    const workspaceEl = document.getElementById('anatomical-map-workspace');
-                    if (workspaceEl) workspaceEl.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                className={`pt-2.5 border-t border-slate-800 flex items-start gap-2 cursor-pointer rounded p-1.5 transition-all ${
-                  conciseData.hasPathology
-                    ? 'bg-amber-950/40 border-amber-900/60 hover:bg-amber-900/50'
-                    : 'hover:bg-slate-800/60'
-                }`}
-              >
-                <span className="font-bold text-xs uppercase tracking-wider text-teal-400 flex-shrink-0">
-                  KEY IMPRESSION:
-                </span>
-                <span
-                  className={`text-xs font-semibold ${
-                    conciseData.hasPathology ? 'text-amber-300' : 'text-slate-200'
-                  }`}
-                >
-                  "{conciseData.keyImpression}"
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Bottom Footer Actions & Hint */}

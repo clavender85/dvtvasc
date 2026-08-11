@@ -1023,34 +1023,229 @@ export function generateConcisePreviewData(state: ExamState): ConcisePreviewData
   }
 
   // --- 7. KEY IMPRESSION LINE ---
-  let keyImpression = '';
-  let impressionVesselIds: string[] = [];
-
-  if (hasDeepDvt) {
-    const abnormalNames = deepAbnormalList.map((f) => `${f.side.toUpperCase()} ${f.vesselName}`).join(', ');
-    keyImpression = `${abnormalNames} DVT.`;
-    impressionVesselIds = deepAbnormalList.map((f) => f.id);
-  } else if (superficialAbnormal.length > 0) {
-    const supNames = superficialAbnormal.map((f) => `${f.side.toUpperCase()} ${f.vesselName}`).join(', ');
-    keyImpression = `${supNames} superficial venous thrombosis. No DVT identified.`;
-    impressionVesselIds = superficialAbnormal.map((f) => f.id);
-  } else {
-    keyImpression = `No DVT identified in the assessed ${sideText} deep veins.`;
-    impressionVesselIds = [];
-  }
-
-  if (otherFindings && otherFindings.length > 0) {
-    const ofSummaries = otherFindings.map((of) => {
-      const dimStr = formatOtherFindingDimensions(of);
-      return `${of.side} ${of.type}${dimStr ? ' measuring ' + dimStr : ''}`;
-    }).join('; ');
-    keyImpression += ` Incidental non-venous finding: ${ofSummaries}.`;
-  }
+  const keyImpData = generateKeyImpression(state);
 
   return {
     summarySentences: sentences,
-    keyImpression,
-    impressionVesselIds,
+    keyImpression: keyImpData.text,
+    impressionVesselIds: keyImpData.sourceVesselIds,
     hasPathology
+  };
+}
+
+export interface KeyImpressionResult {
+  text: string;
+  sourceVesselIds: string[];
+}
+
+function capitalizeStr(str: string): string {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function generateKeyImpression(state: ExamState): KeyImpressionResult {
+  const { header, vesselFindings, limitations, otherFindings, pelvic, comparisons, comparisonState } = state;
+  const scope = getNormalizedScope(header);
+
+  const isRightExamined = scope.regionsExamined.rightLowerLimb;
+  const isLeftExamined = scope.regionsExamined.leftLowerLimb;
+  const isBilateral = isRightExamined && isLeftExamined;
+
+  let sideText = 'bilateral lower limb';
+  if (!isBilateral) {
+    if (isRightExamined) sideText = 'right lower limb';
+    else if (isLeftExamined) sideText = 'left lower limb';
+  }
+
+  const allFindings = Object.values(vesselFindings || {}) as VesselFinding[];
+
+  // 1. Check for Empty / Incomplete Case
+  const assessedCount = allFindings.filter((f) => f.status !== 'not_assessed').length;
+  if (assessedCount === 0 && Object.keys(vesselFindings || {}).length === 0) {
+    return { text: 'Examination findings incomplete.', sourceVesselIds: [] };
+  }
+
+  // Collect Deep & Superficial Abnormalities
+  const deepAbnormal = allFindings.filter((f) => f.category !== 'superficial' && f.status === 'abnormal');
+  const superficialAbnormal = allFindings.filter((f) => f.category === 'superficial' && f.status === 'abnormal');
+
+  // Check if pelvic/iliac status is abnormal
+  const isIliocavalAbnormal =
+    pelvic?.ivcStatus === 'thrombus_present' ||
+    pelvic?.civRightStatus === 'thrombus_present' ||
+    pelvic?.civLeftStatus === 'thrombus_present' ||
+    vesselFindings?.['right_CIV']?.status === 'abnormal' ||
+    vesselFindings?.['left_CIV']?.status === 'abnormal' ||
+    vesselFindings?.['right_EIV']?.status === 'abnormal' ||
+    vesselFindings?.['left_EIV']?.status === 'abnormal';
+
+  // Check for Follow-Up / Interval Comparison
+  const isFollowUp = Boolean(comparisonState?.header?.hasPriorExam || (comparisons && comparisons.length > 0));
+  const priorExamDate = comparisonState?.header?.examDate;
+  const priorDateStr = priorExamDate ? ` compared with ${priorExamDate}` : '';
+
+  let keyImpressionText = '';
+  const impressionVesselIds: string[] = [];
+
+  // --- CASE A: DEEP DVT PRESENT ---
+  if (deepAbnormal.length > 0) {
+    deepAbnormal.forEach((f) => impressionVesselIds.push(f.id));
+
+    const rightDeep = deepAbnormal.filter((f) => f.side === 'right');
+    const leftDeep = deepAbnormal.filter((f) => f.side === 'left');
+
+    const sideSummaries: string[] = [];
+
+    ['right', 'left'].forEach((sideKey) => {
+      const sideAbnormals = sideKey === 'right' ? rightDeep : leftDeep;
+      if (sideAbnormals.length === 0) return;
+
+      const sideLabel = sideKey; // 'left' or 'right'
+      const vesselKeys = sideAbnormals.map((f) => f.vesselKey);
+      const vesselNames = sideAbnormals.map((f) => f.vesselName);
+
+      const mainChronicity = sideAbnormals[0].chronicity || 'acute_appearing';
+      const mainPatency = sideAbnormals[0].patency || 'completely_occluded';
+      const chronicityLabel = formatChronicity(mainChronicity);
+      const patencyLabel = formatPatency(mainPatency);
+
+      const isAcuteOnChronic = sideAbnormals.some((f) => f.chronicity === 'acute_on_chronic');
+      const isPureChronic = sideAbnormals.every((f) => f.chronicity === 'chronic_post_thrombotic');
+
+      const hasCFV = vesselKeys.includes('CFV');
+      const hasFV = vesselKeys.some((k) => k.startsWith('FV'));
+      const hasPOPV = vesselKeys.includes('POPV');
+      const hasTPTV = vesselKeys.includes('TPTV');
+      const hasCalfDeep = vesselKeys.some((k) => ['PTV', 'PERV', 'ATV'].includes(k));
+      const hasMuscular = vesselKeys.some((k) => ['MGV', 'LGV', 'SV'].includes(k));
+
+      const isDeepMainAndMuscular = (hasPOPV || hasTPTV || hasCalfDeep) && hasMuscular;
+
+      // 1. Iliofemoral / Extensive Proximal DVT
+      if (hasCFV && hasFV && hasPOPV) {
+        if (isIliocavalAbnormal) {
+          sideSummaries.push(`Extensive ${sideLabel} iliofemoral DVT extending into the CFV and femoral vein`);
+        } else {
+          sideSummaries.push(`Extensive ${chronicityLabel} ${patencyLabel} DVT involving the ${sideLabel} CFV, FV and popliteal vein`);
+        }
+      }
+      // 2. Multi-vessel continuous DVT (Popliteal/TPT/Peroneal)
+      else if (hasPOPV && (hasTPTV || hasCalfDeep) && !hasCFV) {
+        const deepNames: string[] = [];
+        if (hasPOPV) deepNames.push('popliteal');
+        if (hasTPTV) deepNames.push('TPT');
+        if (vesselKeys.includes('PERV')) deepNames.push('peroneal');
+        if (vesselKeys.includes('PTV')) deepNames.push('posterior tibial');
+
+        const deepStr = deepNames.join('/');
+
+        if (isDeepMainAndMuscular) {
+          const muscNames = sideAbnormals
+            .filter((f) => ['MGV', 'LGV', 'SV'].includes(f.vesselKey))
+            .map((f) => f.vesselName.toLowerCase())
+            .join(' and ');
+          sideSummaries.push(`${capitalizeStr(sideLabel)} ${deepStr} DVT with separate ${muscNames} vein thrombosis`);
+        } else if (vesselKeys.includes('TPTV') && vesselKeys.includes('PERV')) {
+          sideSummaries.push(`${capitalizeStr(chronicityLabel)} ${patencyLabel} ${sideLabel} popliteal DVT extending through the TPT into the peroneal veins`);
+        } else {
+          sideSummaries.push(`${capitalizeStr(chronicityLabel)} ${patencyLabel} ${sideLabel} ${deepStr} DVT, without femoral extension`);
+        }
+      }
+      // 3. Single vessel or specific chronic / acute on chronic
+      else if (sideAbnormals.length === 1) {
+        const singleF = sideAbnormals[0];
+        const extentStr = formatExtent(singleF);
+
+        if (isAcuteOnChronic) {
+          sideSummaries.push(`Acute-appearing ${sideLabel} ${singleF.vesselName} DVT superimposed on chronic post-thrombotic change`);
+        } else if (singleF.chronicity === 'chronic_post_thrombotic') {
+          if (singleF.patency === 'recanalised') {
+            sideSummaries.push(`Chronic post-thrombotic change within the ${sideLabel} ${singleF.vesselName} with partial recanalisation`);
+          } else if ((singleF.morphology as any)?.includes('synechiae')) {
+            sideSummaries.push(`Chronic ${sideLabel} ${singleF.vesselName} post-thrombotic change with recanalisation and residual intraluminal synechiae`);
+          } else {
+            sideSummaries.push(`Chronic post-thrombotic change within the ${sideLabel} ${singleF.vesselName}`);
+          }
+        } else {
+          const extPhrase = extentStr ? ` ${extentStr}` : '';
+          sideSummaries.push(`${capitalizeStr(chronicityLabel)} ${patencyLabel} ${sideLabel} ${singleF.vesselName} DVT${extPhrase}`);
+        }
+      }
+      // 4. General multi-vessel fallback
+      else {
+        const nameList = vesselNames.join(', ');
+        if (isAcuteOnChronic) {
+          sideSummaries.push(`Acute-appearing ${sideLabel} ${nameList} DVT superimposed on chronic post-thrombotic change`);
+        } else if (isPureChronic) {
+          sideSummaries.push(`Chronic post-thrombotic change within the ${sideLabel} ${nameList}`);
+        } else {
+          sideSummaries.push(`${capitalizeStr(chronicityLabel)} ${patencyLabel} ${sideLabel} ${nameList} DVT`);
+        }
+      }
+    });
+
+    keyImpressionText = sideSummaries.join('; ') + '.';
+
+    // If follow-up, incorporate comparison terms
+    if (isFollowUp) {
+      const keyComp = generateKeyComparisonFinding(state);
+      if (keyComp) {
+        keyImpressionText = `${keyComp}${priorDateStr}.`;
+      }
+    }
+  }
+  // --- CASE B: NO DEEP DVT, BUT SUPERFICIAL THROMBOSIS PRESENT ---
+  else if (superficialAbnormal.length > 0) {
+    superficialAbnormal.forEach((f) => impressionVesselIds.push(f.id));
+
+    const supDescs = superficialAbnormal.map((f) => {
+      let termStr = '';
+      if (f.distanceToJunction && f.distanceToJunction.distanceMm !== undefined) {
+        termStr = ` terminating ${f.distanceToJunction.distanceMm} mm distal to the ${f.distanceToJunction.junction}`;
+      }
+      return `Superficial thrombosis of the ${f.side} ${f.vesselName}${termStr}`;
+    });
+
+    keyImpressionText = `No DVT identified. ${supDescs.join('; ')}.`;
+  }
+  // --- CASE C: NO DVT & NO SUPERFICIAL THROMBOSIS (NORMAL / LIMITED) ---
+  else {
+    if (limitations?.hasLimitations && limitations.factors?.length > 0) {
+      const isCalfLimitation = limitations.factors.some(
+        (f) => f.toLowerCase().includes('calf') || f.toLowerCase().includes('edema') || f.toLowerCase().includes('oedema')
+      );
+      if (isCalfLimitation) {
+        keyImpressionText = `No DVT identified within the visualised ${sideText} deep veins; calf assessment limited.`;
+      } else {
+        const factorStr = limitations.factors.map((f) => f.replace(/_/g, ' ')).join(', ');
+        keyImpressionText = `No DVT identified within the assessed ${sideText} veins; assessment limited by ${factorStr}.`;
+      }
+    } else {
+      if (isBilateral) {
+        keyImpressionText = 'No DVT identified within the assessed bilateral lower limb deep veins.';
+      } else {
+        keyImpressionText = `No DVT identified within the assessed ${sideText} deep veins.`;
+      }
+    }
+
+    if (otherFindings && otherFindings.length > 0) {
+      const othSummaries = otherFindings
+        .map((of) => {
+          const dimStr = formatOtherFindingDimensions(of);
+          return `${capitalizeStr(of.side)} ${of.type}${dimStr ? ' measuring ' + dimStr : ''}`;
+        })
+        .join('; ');
+
+      if (keyImpressionText.endsWith('.')) {
+        keyImpressionText = keyImpressionText.slice(0, -1) + `. ${othSummaries}.`;
+      } else {
+        keyImpressionText += ` ${othSummaries}.`;
+      }
+    }
+  }
+
+  return {
+    text: keyImpressionText,
+    sourceVesselIds: impressionVesselIds
   };
 }

@@ -507,6 +507,7 @@ export const App: React.FC = () => {
                         </div>
                         <div className="lg:col-span-6 flex flex-col">
                           <AnatomicalDiagram
+                            state={examState}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
                             selectedVesselIds={selectedVesselIds}
@@ -522,6 +523,7 @@ export const App: React.FC = () => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
                             }}
+                            onOpenFullReport={() => setActiveTab('summary')}
                           />
                         </div>
                         <div className="lg:col-span-3 flex flex-col">
@@ -568,6 +570,7 @@ export const App: React.FC = () => {
                         </div>
                         <div className="lg:col-span-8 flex flex-col">
                           <AnatomicalDiagram
+                            state={examState}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
                             selectedVesselIds={selectedVesselIds}
@@ -583,6 +586,7 @@ export const App: React.FC = () => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
                             }}
+                            onOpenFullReport={() => setActiveTab('summary')}
                           />
                         </div>
                       </>
@@ -593,6 +597,7 @@ export const App: React.FC = () => {
                       <>
                         <div className="lg:col-span-8 flex flex-col">
                           <AnatomicalDiagram
+                            state={examState}
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
                             selectedVesselIds={selectedVesselIds}
@@ -608,6 +613,7 @@ export const App: React.FC = () => {
                               const el = document.getElementById('live-report-preview-panel');
                               if (el) el.scrollIntoView({ behavior: 'smooth' });
                             }}
+                            onOpenFullReport={() => setActiveTab('summary')}
                           />
                         </div>
                         <div className="lg:col-span-4 flex flex-col">
