@@ -171,14 +171,7 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
     const isExamined = side === 'right' ? scope.regionsExamined.rightLowerLimb : scope.regionsExamined.leftLowerLimb;
 
     if (!isExamined) {
-      blocks.push({
-        id: `block-${side}-unexamined`,
-        section: `${sideLabel.toUpperCase()} LOWER LIMB`,
-        text: `=== ${sideLabel.toUpperCase()} LOWER LIMB ===\n${sideLabel} lower limb was not included in this exam request and was NOT assessed.`,
-        sourceType: 'vessel',
-        region: regionKey,
-        category: 'normal'
-      });
+      // Unexamined side is simply omitted from report unless explicitly examined
       return;
     }
 

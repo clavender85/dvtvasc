@@ -21,6 +21,8 @@ interface HeaderBarProps {
   onToggleSignOff: (signed: boolean) => void;
   activeTab: 'worksheet' | 'summary' | 'comparison';
   setActiveTab: (tab: 'worksheet' | 'summary' | 'comparison') => void;
+  onOpenReviewPanel?: () => void;
+  onScrollToFindingsPreview?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -36,7 +38,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   sonographerSignOff,
   onToggleSignOff,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  onOpenReviewPanel,
+  onScrollToFindingsPreview
 }) => {
   const scope = getNormalizedScope(header);
 
@@ -65,7 +69,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     onChangeHeader({ ...header, indications: next });
   };
 
-  const warningCount = alerts.filter((a) => a.severity === 'warning').length;
+  const errorCount = alerts.filter((a) => a.severity === 'error').length;
+  const reviewCount = alerts.filter((a) => a.severity === 'warning').length;
 
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-slate-100 shadow-md sticky top-0 z-30">
@@ -101,44 +106,85 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Main Action Bar */}
       <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 bg-slate-900">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
-          <button
-            onClick={() => setActiveTab('worksheet')}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'worksheet'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Anatomy & Worksheet
-          </button>
-          <button
-            onClick={() => setActiveTab('comparison')}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'comparison'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Prior Study Comparison
-          </button>
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 relative ${
-              activeTab === 'summary'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Sonographer Summary
-            {warningCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center ml-1">
-                {warningCount}
-              </span>
-            )}
-          </button>
+        {/* Navigation Tabs + Examination Review Badge */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            <button
+              onClick={() => setActiveTab('worksheet')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'worksheet'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Anatomy & Worksheet
+            </button>
+            <button
+              onClick={() => setActiveTab('comparison')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'comparison'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              Prior Study Comparison
+            </button>
+            <button
+              onClick={() => setActiveTab('summary')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 relative ${
+                activeTab === 'summary'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              Sonographer Summary
+            </button>
+          </div>
+
+          {/* Compact Examination Review Indicator */}
+          {onOpenReviewPanel && (
+            <button
+              onClick={onOpenReviewPanel}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm border ${
+                errorCount > 0
+                  ? 'bg-rose-950 text-rose-200 border-rose-800 hover:bg-rose-900 animate-pulse'
+                  : reviewCount > 0
+                  ? 'bg-amber-950 text-amber-200 border-amber-800 hover:bg-amber-900'
+                  : 'bg-emerald-950 text-emerald-300 border-emerald-800/80 hover:bg-emerald-900'
+              }`}
+              title="Open Examination Review Panel"
+            >
+              {errorCount > 0 ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  <span>🔴 {errorCount} Error{errorCount > 1 ? 's' : ''}</span>
+                </>
+              ) : reviewCount > 0 ? (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>⚠ Review ({reviewCount})</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>✓ Exam Review</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Review Findings ↓ smooth scroll button when on worksheet view */}
+          {activeTab === 'worksheet' && onScrollToFindingsPreview && (
+            <button
+              onClick={onScrollToFindingsPreview}
+              className="bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+              title="Scroll down to live report findings preview"
+            >
+              <span>Review Findings</span>
+              <span className="text-[10px]">↓</span>
+            </button>
+          )}
         </div>
 
         {/* Quick Action Buttons */}
@@ -376,23 +422,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           />
         </div>
       </div>
-
-      {/* Validation Warning Alert Drawer / Banner */}
-      {alerts.length > 0 && (
-        <div className="bg-amber-950/80 border-t border-amber-800/80 px-4 py-2 text-xs flex items-center justify-between gap-2 text-amber-200">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <span className="font-semibold">{alerts.length} Clinical Logic Check Notice(s):</span>
-            <span className="truncate max-w-2xl">{alerts[0].message}</span>
-          </div>
-          <button
-            onClick={() => setActiveTab('summary')}
-            className="text-amber-300 underline font-semibold text-[11px] hover:text-amber-100 flex-shrink-0"
-          >
-            Review Summary
-          </button>
-        </div>
-      )}
     </header>
   );
 };

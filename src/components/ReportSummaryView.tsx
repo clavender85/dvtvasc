@@ -13,9 +13,10 @@ import {
   CheckSquare,
   Square,
   CheckCircle2,
-  MousePointer,
   FileSearch,
-  Eye
+  ArrowLeft,
+  ExternalLink,
+  AlertCircle
 } from 'lucide-react';
 
 interface ReportSummaryViewProps {
@@ -29,6 +30,7 @@ interface ReportSummaryViewProps {
   sonographerSignOff: boolean;
   onToggleSignOff: (signed: boolean) => void;
   onSelectVessel?: (vesselId: string) => void;
+  onBackToWorksheet?: () => void;
 }
 
 export const ReportSummaryView: React.FC<ReportSummaryViewProps> = ({
@@ -41,7 +43,8 @@ export const ReportSummaryView: React.FC<ReportSummaryViewProps> = ({
   alerts,
   sonographerSignOff,
   onToggleSignOff,
-  onSelectVessel
+  onSelectVessel,
+  onBackToWorksheet
 }) => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'text' | 'blocks'>('text');
@@ -51,12 +54,33 @@ export const ReportSummaryView: React.FC<ReportSummaryViewProps> = ({
   const isSynchronized = liveFreshSummary.trim() === summaryText.trim();
   const blocks = generateStructuredReportBlocks(state);
 
+  const errors = alerts.filter((a) => a.severity === 'error');
+  const reviews = alerts.filter((a) => a.severity === 'warning');
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl text-slate-100 p-5 space-y-5">
+      {/* Top Breadcrumb & Back Action Bar */}
+      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 text-xs">
+        <div className="flex items-center gap-2 text-slate-400">
+          <span>DVT WORKSHEET</span>
+          <span>›</span>
+          <span className="font-bold text-teal-400">Sonographer Summary & Final Report</span>
+        </div>
+        {onBackToWorksheet && (
+          <button
+            onClick={onBackToWorksheet}
+            className="bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>← BACK TO WORKSHEET</span>
+          </button>
+        )}
+      </div>
+
       {/* Top Controls Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-bold text-slate-100 uppercase tracking-wider flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-teal-400" />
               STRUCTURED SONOGRAPHER FINDINGS SUMMARY
@@ -160,22 +184,67 @@ export const ReportSummaryView: React.FC<ReportSummaryViewProps> = ({
         </div>
       )}
 
-      {/* Logic Alerts Drawer */}
-      {alerts.length > 0 && (
-        <div className="p-4 bg-amber-950/80 border border-amber-800 rounded-xl space-y-2 text-xs text-amber-200">
-          <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-            Clinical Consistency Engine Alerts ({alerts.length})
+      {/* EXAMINATION REVIEW Section (Requirement 25) */}
+      <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2 text-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-slate-200 uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-teal-400" />
+            <span>EXAMINATION REVIEW</span>
           </div>
-          <div className="space-y-1.5 pl-6">
-            {alerts.map((a) => (
-              <p key={a.id} className="text-amber-200">
-                • <strong className="text-amber-100">{a.title}:</strong> {a.message}
-              </p>
+          {errors.length === 0 && reviews.length === 0 && (
+            <span className="text-emerald-400 font-bold text-xs flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4" />
+              ✓ Examination review complete — no inconsistencies detected
+            </span>
+          )}
+        </div>
+
+        {errors.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <div className="text-rose-400 font-bold flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4" />
+              <span>Contradictions Detected ({errors.length}):</span>
+            </div>
+            {errors.map((err) => (
+              <div key={err.id} className="p-2 bg-rose-950/70 border border-rose-800/80 rounded-lg flex items-center justify-between text-rose-200">
+                <span>• <strong>{err.title}:</strong> {err.message}</span>
+                {err.actionVesselId && onSelectVessel && (
+                  <button
+                    onClick={() => onSelectVessel(err.actionVesselId!)}
+                    className="bg-rose-900 hover:bg-rose-800 text-rose-100 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <span>Fix In Worksheet</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+
+        {reviews.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <div className="text-amber-400 font-bold flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Clinical Prompts ({reviews.length}):</span>
+            </div>
+            {reviews.map((rev) => (
+              <div key={rev.id} className="p-2 bg-amber-950/60 border border-amber-800/70 rounded-lg flex items-center justify-between text-amber-200">
+                <span>• <strong>{rev.title}:</strong> {rev.message}</span>
+                {rev.actionVesselId && onSelectVessel && (
+                  <button
+                    onClick={() => onSelectVessel(rev.actionVesselId!)}
+                    className="bg-amber-900 hover:bg-amber-800 text-amber-100 px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <span>Go to Vessel</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* View Toggle Mode: Plain Text vs Interactive Blocks */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
