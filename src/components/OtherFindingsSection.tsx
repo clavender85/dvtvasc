@@ -10,21 +10,16 @@ interface OtherFindingsSectionProps {
 }
 
 const FINDING_TYPES = [
-  "Baker's cyst",
-  "Ruptured Baker's cyst appearance",
-  'Oedema',
+  "Baker's / popliteal cyst",
+  "Suspected ruptured Baker's cyst",
   'Haematoma',
   'Collection',
-  'Lymph node',
-  'Superficial thrombophlebitis',
-  'Varicose veins',
-  'Venous aneurysm',
-  'Duplicated femoral vein',
-  'Duplicated popliteal vein',
-  'Anatomical variant',
-  'Absent/hypoplastic vessel',
+  'Oedema',
+  'Enlarged lymph node',
   'Collateral veins',
-  'Pulsatile venous flow',
+  'Superficial varicosities',
+  'Superficial thrombosis',
+  'Venous aneurysmal dilatation',
   'Other'
 ];
 
@@ -37,10 +32,9 @@ export const OtherFindingsSection: React.FC<OtherFindingsSectionProps> = ({
   const addFinding = () => {
     const newItem: OtherFindingItem = {
       id: `of-${Date.now()}`,
-      type: "Baker's cyst",
+      type: "Baker's / popliteal cyst",
       side: 'Left',
       location: 'Popliteal fossa',
-      dimensions: '',
       comments: ''
     };
     onChangeOtherFindings([...otherFindings, newItem]);
@@ -142,16 +136,45 @@ export const OtherFindingsSection: React.FC<OtherFindingsSectionProps> = ({
                       className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100"
                     />
 
-                    <input
-                      type="text"
-                      placeholder="Dimensions e.g. 4.2 x 1.8 x 2.1 cm"
-                      value={item.dimensions || ''}
-                      onChange={(e) => {
-                        const next = otherFindings.map((f) => (f.id === item.id ? { ...f, dimensions: e.target.value } : f));
-                        onChangeOtherFindings(next);
-                      }}
-                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100"
-                    />
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-1">
+                      <span className="text-[10px] text-slate-400 font-semibold">3 Dims (mm):</span>
+                      <input
+                        type="number"
+                        placeholder="L"
+                        value={item.dimensionsLengthMm ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseFloat(e.target.value) : null;
+                          const next = otherFindings.map((f) => (f.id === item.id ? { ...f, dimensionsLengthMm: val } : f));
+                          onChangeOtherFindings(next);
+                        }}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded px-1 text-center text-slate-100"
+                      />
+                      <span className="text-slate-500">x</span>
+                      <input
+                        type="number"
+                        placeholder="W"
+                        value={item.dimensionsWidthMm ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseFloat(e.target.value) : null;
+                          const next = otherFindings.map((f) => (f.id === item.id ? { ...f, dimensionsWidthMm: val } : f));
+                          onChangeOtherFindings(next);
+                        }}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded px-1 text-center text-slate-100"
+                      />
+                      <span className="text-slate-500">x</span>
+                      <input
+                        type="number"
+                        placeholder="D"
+                        value={item.dimensionsDepthMm ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseFloat(e.target.value) : null;
+                          const next = otherFindings.map((f) => (f.id === item.id ? { ...f, dimensionsDepthMm: val } : f));
+                          onChangeOtherFindings(next);
+                        }}
+                        className="w-12 bg-slate-950 border border-slate-800 rounded px-1 text-center text-slate-100"
+                      />
+                      <span className="text-[10px] text-slate-400">mm</span>
+                    </div>
                   </div>
 
                   <input

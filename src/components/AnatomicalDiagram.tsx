@@ -10,7 +10,8 @@ import {
   Compressibility,
   Patency,
   SonographicChronicity,
-  ThrombusEchogenicity
+  ThrombusEchogenicity,
+  NON_VISUALIZATION_REASON_LABELS
 } from '../types/dvt';
 import { LANDMARK_LABELS } from '../data/anatomyData';
 import {
@@ -41,6 +42,10 @@ import {
 interface AnatomicalDiagramProps {
   vesselFindings: Record<string, VesselFinding>;
   selectedVesselId: string | null;
+  selectedVesselIds?: string[];
+  onToggleSelectVessel?: (vesselId: string) => void;
+  onClearSelection?: () => void;
+  onSelectGroup?: (vesselIds: string[]) => void;
   onSelectVessel: (vesselId: string) => void;
   onQuickToggleStatus?: (vesselId: string, status: VesselStatus) => void;
   onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
@@ -163,6 +168,10 @@ const LANDMARK_Y = {
 export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   vesselFindings,
   selectedVesselId,
+  selectedVesselIds: propsSelectedVesselIds,
+  onToggleSelectVessel,
+  onClearSelection,
+  onSelectGroup,
   onSelectVessel,
   onQuickToggleStatus,
   onBatchUpdateFindings,
@@ -173,18 +182,34 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showLandmarks, setShowLandmarks] = useState<boolean>(true);
   const [showTextLabels, setShowTextLabels] = useState<boolean>(false);
-  const [clickMode, setClickMode] = useState<'toggle_abnormal' | 'select_only'>('toggle_abnormal');
   const [filterMode, setFilterMode] = useState<'all' | 'abnormal_only' | 'routine'>('all');
 
   // Double Click / Double Tap Tracker
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
-  // Multi-Selection State
-  const [selectedVesselIds, setSelectedVesselIds] = useState<string[]>(
+  // Internal Fallback Multi-Selection State if props not provided
+  const [localSelectedVesselIds, setLocalSelectedVesselIds] = useState<string[]>(
     selectedVesselId ? [selectedVesselId] : []
   );
-  const [isMultiSelectMode, setIsMultiSelectMode] = useState<boolean>(false);
+  const selectedVesselIds = propsSelectedVesselIds || localSelectedVesselIds;
+
   const [showBatchDrawer, setShowBatchDrawer] = useState<boolean>(false);
+
+  // Esc Key Listener to Clear Selection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (onClearSelection) {
+          onClearSelection();
+        } else {
+          setLocalSelectedVesselIds([]);
+        }
+        setShowBatchDrawer(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClearSelection]);
 
   // Batch property form state
   const [batchStatus, setBatchStatus] = useState<VesselStatus | ''>('');
@@ -201,74 +226,59 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   const [batchDistalRelation, setBatchDistalRelation] = useState<'at' | 'above' | 'below'>('at');
   const [batchDistalDistance, setBatchDistalDistance] = useState<string>('');
 
-  // Keep selection in sync when parent selectedVesselId changes
-  useEffect(() => {
-    if (selectedVesselId && !selectedVesselIds.includes(selectedVesselId) && !isMultiSelectMode) {
-      setSelectedVesselIds([selectedVesselId]);
-    }
-  }, [selectedVesselId]);
-
   const hoveredFinding = hoveredId ? vesselFindings[hoveredId] : null;
   const hoveredComparison = hoveredId && comparisons ? comparisons[hoveredId] : null;
 
-  // Handle clicking a vessel segment (1-Click highlight, 2-Clicks describe thrombus)
+  // Single Click = Select / Deselect ONLY
+  // Double Click = Open Detail Modal or Batch Drawer
   const handleVesselClick = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const now = Date.now();
     const timeDiff = now - lastClickRef.current.time;
-    const isDoubleTap = lastClickRef.current.id === id && timeDiff < 450;
+    const isDoubleTap = lastClickRef.current.id === id && timeDiff < 400;
     lastClickRef.current = { id, time: now };
 
-    const isModifier = e && (e.shiftKey || e.ctrlKey || e.metaKey);
-    const currentFinding = vesselFindings[id];
-    const isAlreadyAbnormal = currentFinding?.status === 'abnormal';
-
-    // 2-CLICKS (Double Click or Second Click on highlighted vessel) -> Open Thrombus Description Modal
-    if (isDoubleTap || (isAlreadyAbnormal && clickMode === 'toggle_abnormal' && timeDiff < 900)) {
-      onSelectVessel(id);
-      if (onOpenDetailModal) {
-        onOpenDetailModal(id);
+    if (isDoubleTap) {
+      if (selectedVesselIds.length > 1) {
+        setShowBatchDrawer(true);
+      } else {
+        onSelectVessel(id);
+        if (onOpenDetailModal) {
+          onOpenDetailModal(id);
+        }
       }
       return;
     }
 
-    if (isMultiSelectMode || isModifier) {
-      // Toggle selection in explicit multi-select mode
-      setSelectedVesselIds((prev) => {
-        const exists = prev.includes(id);
-        const next = exists ? prev.filter((item) => item !== id) : [...prev, id];
-        if (next.length === 1) {
-          onSelectVessel(next[0]);
-        }
-        return next;
-      });
+    // Single Click Action: Toggle Selection ONLY
+    if (onToggleSelectVessel) {
+      onToggleSelectVessel(id);
     } else {
-      // 1-CLICK ACTION: Toggle DVT highlight directly on the segment
-      if (clickMode === 'toggle_abnormal' && onQuickToggleStatus) {
-        const nextStatus: VesselStatus = isAlreadyAbnormal ? 'normal' : 'abnormal';
-        onQuickToggleStatus(id, nextStatus);
-      }
+      setLocalSelectedVesselIds((prev) =>
+        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      );
+    }
+    onSelectVessel(id);
+  };
 
-      // Add to selectedVesselIds so multiple segments stay highlighted together
-      setSelectedVesselIds((prev) => {
-        if (prev.includes(id)) {
-          return prev;
-        }
-        return [...prev, id];
-      });
-
-      onSelectVessel(id);
+  // Selection helper
+  const updateSelectedIds = (ids: string[]) => {
+    if (onSelectGroup) {
+      onSelectGroup(ids);
+    } else {
+      setLocalSelectedVesselIds(ids);
     }
   };
 
   // Quick Selection Helpers
   const selectAllRightLeg = () => {
     const ids = Object.keys(vesselFindings).filter((id) => id.startsWith('right_'));
-    setSelectedVesselIds(ids);
+    updateSelectedIds(ids);
   };
 
   const selectAllLeftLeg = () => {
     const ids = Object.keys(vesselFindings).filter((id) => id.startsWith('left_'));
-    setSelectedVesselIds(ids);
+    updateSelectedIds(ids);
   };
 
   const selectAllCalfVeins = () => {
@@ -276,22 +286,26 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     const ids = Object.keys(vesselFindings).filter((id) =>
       calfKeys.some((k) => id.includes(k))
     );
-    setSelectedVesselIds(ids);
+    updateSelectedIds(ids);
   };
 
   const selectAllAbnormal = () => {
     const ids = Object.keys(vesselFindings).filter(
       (id) => vesselFindings[id]?.status === 'abnormal'
     );
-    setSelectedVesselIds(ids);
+    updateSelectedIds(ids);
   };
 
   const selectAllVessels = () => {
-    setSelectedVesselIds(Object.keys(vesselFindings));
+    updateSelectedIds(Object.keys(vesselFindings));
   };
 
   const clearSelection = () => {
-    setSelectedVesselIds([]);
+    if (onClearSelection) {
+      onClearSelection();
+    } else {
+      setLocalSelectedVesselIds([]);
+    }
   };
 
   // Quick 1-click batch status trigger
@@ -461,23 +475,26 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         lumenType: 'none_faint',
         lumenColor: 'transparent',
         lumenWidth: 0,
-        statusText: 'Not Assessed',
+        statusText: 'Not Examined (NA)',
         opacity: 0.45
       };
     }
 
     if (finding.status === 'not_visualised') {
+      const reasonKey = finding.nonVisualizationReason || 'body_habitus';
+      const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'Technical Limitation';
+      const customNote = finding.customNonVisualizationReason ? `: ${finding.customNonVisualizationReason}` : '';
       return {
-        wallColor: '#64748b',
-        wallDashArray: '3 3',
-        wallWidth: calculatedWidth * 0.8,
+        wallColor: '#f59e0b',
+        wallDashArray: '2 3',
+        wallWidth: calculatedWidth * 0.85,
         fillColor: 'transparent',
         fillWidth: 0,
         lumenType: 'none_faint',
         lumenColor: 'transparent',
         lumenWidth: 0,
-        statusText: 'Not Visualised',
-        opacity: 0.7
+        statusText: `Not Visualised (NV) [${reasonLabel}${customNote}]`,
+        opacity: 0.85
       };
     }
 
@@ -871,67 +888,54 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           </span>
         </div>
 
-        {/* Display & Mode Controls */}
+        {/* Display & Selection Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Click Action Mode Selector */}
-          <button
-            type="button"
-            onClick={() =>
-              setClickMode((prev) => (prev === 'toggle_abnormal' ? 'select_only' : 'toggle_abnormal'))
-            }
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
-              clickMode === 'toggle_abnormal'
-                ? 'bg-rose-950 text-rose-300 border-rose-600 shadow-md shadow-rose-950/50'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-            }`}
-            title="Clicking a segment on the diagram directly toggles its DVT abnormality highlight"
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-            <span>Click Action:</span>
-            <span className="font-bold">
-              {clickMode === 'toggle_abnormal' ? 'Toggle DVT Highlight' : 'Select Only'}
-            </span>
-          </button>
+          {/* Active Selection Badge & Counter */}
+          {selectedVesselIds.length > 0 ? (
+            <div className="flex items-center gap-1.5 bg-sky-950/80 border border-sky-600/80 rounded-md px-2.5 py-1 text-sky-200">
+              <span className="font-bold text-[11px] uppercase tracking-wider">
+                {selectedVesselIds.length} Selected
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClearSelection) onClearSelection();
+                  else setLocalSelectedVesselIds([]);
+                }}
+                className="ml-1 text-sky-400 hover:text-white text-[10px] underline font-medium"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">No vessels selected</span>
+          )}
+
+          {/* Batch Edit Selected Button */}
+          {selectedVesselIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowBatchDrawer(true)}
+              className="px-2.5 py-1 rounded text-[11px] font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md flex items-center gap-1.5 transition-all"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Batch Edit Selected ({selectedVesselIds.length})</span>
+            </button>
+          )}
 
           {/* Text Descriptors Toggle Button */}
           <button
             type="button"
             onClick={() => setShowTextLabels(!showTextLabels)}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all border flex items-center gap-1.5 ${
+            className={`px-2 py-1 rounded text-[11px] font-bold transition-all border flex items-center gap-1.5 ${
               showTextLabels
                 ? 'bg-amber-950 text-amber-300 border-amber-700'
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
             }`}
-            title="Toggle written text descriptors (pfv, prox fv, etc.) on the diagram"
+            title="Toggle written text labels on the map"
           >
             <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>Text Descriptors:</span>
-            <span className="font-bold">{showTextLabels ? 'ON' : 'OFF (Graphical)'}</span>
-          </button>
-
-          {/* Multi-Select Toggle Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsMultiSelectMode(!isMultiSelectMode);
-              if (!isMultiSelectMode && selectedVesselIds.length === 0 && selectedVesselId) {
-                setSelectedVesselIds([selectedVesselId]);
-              }
-            }}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 transition-all border ${
-              isMultiSelectMode
-                ? 'bg-sky-950 text-sky-300 border-sky-600 shadow-md shadow-sky-950'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-            }`}
-          >
-            <CheckSquare className="w-3.5 h-3.5 text-sky-400" />
-            <span>Multi-Select:</span>
-            <span className="font-bold">{isMultiSelectMode ? 'ON' : 'OFF'}</span>
-            {selectedVesselIds.length > 0 && (
-              <span className="ml-1 bg-sky-500 text-slate-950 px-1.5 py-0.2 rounded-full font-bold text-[10px]">
-                {selectedVesselIds.length}
-              </span>
-            )}
+            <span>Labels: {showTextLabels ? 'ON' : 'OFF'}</span>
           </button>
 
           <button
@@ -1108,9 +1112,10 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   {finding?.vesselName || vId}
                   <button
                     type="button"
-                    onClick={() =>
-                      setSelectedVesselIds((prev) => prev.filter((id) => id !== vId))
-                    }
+                    onClick={() => {
+                      if (onToggleSelectVessel) onToggleSelectVessel(vId);
+                      else setLocalSelectedVesselIds((prev) => prev.filter((id) => id !== vId));
+                    }}
                     className="hover:text-rose-300 ml-0.5"
                   >
                     ×
@@ -1996,15 +2001,15 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Not Visualised"
-            subtitle="Grey dotted vessel"
-            wallColor="#64748b"
-            wallDashArray="3 3"
+            title="Not Visualised (NV)"
+            subtitle="Amber dotted vessel with reason (e.g. Body Habitus, Edema, Gas)"
+            wallColor="#f59e0b"
+            wallDashArray="2 3"
             lumenType="none_faint"
           />
           <LegendSwatch
-            title="Not Assessed"
-            subtitle="Very faint neutral outline"
+            title="Not Examined (NA)"
+            subtitle="Faint neutral outline (Out of study protocol scope)"
             wallColor="#334155"
             wallDashArray="5 4"
             lumenType="none_faint"
@@ -2027,10 +2032,16 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                     ? 'bg-rose-950 text-rose-300 border border-rose-800'
                     : hoveredFinding.status === 'normal'
                     ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    : hoveredFinding.status === 'not_visualised'
+                    ? 'bg-amber-950 text-amber-300 border border-amber-800'
                     : 'bg-slate-800 text-slate-400'
                 }`}
               >
-                {hoveredFinding.status.replace(/_/g, ' ')}
+                {hoveredFinding.status === 'not_visualised'
+                  ? 'Not Visualised (NV)'
+                  : hoveredFinding.status === 'not_assessed'
+                  ? 'Not Examined (NA)'
+                  : hoveredFinding.status.replace(/_/g, ' ')}
               </span>
               {hoveredFinding.category && (
                 <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
@@ -2067,6 +2078,15 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   </span>
                 )}
               </div>
+            ) : hoveredFinding.status === 'not_visualised' ? (
+              <p className="text-[11px] text-amber-300 font-medium">
+                Attempted, Not Visualised — Reason: {NON_VISUALIZATION_REASON_LABELS[hoveredFinding.nonVisualizationReason || 'body_habitus']}
+                {hoveredFinding.customNonVisualizationReason ? ` (${hoveredFinding.customNonVisualizationReason})` : ''}
+              </p>
+            ) : hoveredFinding.status === 'not_assessed' ? (
+              <p className="text-[11px] text-slate-400 italic">
+                Not Examined / Out of current study protocol scope.
+              </p>
             ) : (
               <p className="text-[11px] text-slate-400">
                 Fully compressible with normal color Doppler lumen filling and phasic flow response.

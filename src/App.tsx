@@ -11,7 +11,9 @@ import { HeaderBar } from './components/HeaderBar';
 import { VesselMatrixView } from './components/VesselMatrixView';
 import { AbnormalFindingsPanel } from './components/AbnormalFindingsPanel';
 import { AnatomicalDiagram } from './components/AnatomicalDiagram';
+import { IliocavalDiagram } from './components/IliocavalDiagram';
 import { VesselTreeList } from './components/VesselTreeList';
+import { PelvicVesselTreeList } from './components/PelvicVesselTreeList';
 import { VesselDetailModal } from './components/VesselDetailModal';
 import { ClinicalHistorySection } from './components/ClinicalHistorySection';
 import { LimitationsSection } from './components/LimitationsSection';
@@ -20,6 +22,13 @@ import { OtherFindingsSection } from './components/OtherFindingsSection';
 import { ComparisonSection } from './components/ComparisonSection';
 import { ReportSummaryView } from './components/ReportSummaryView';
 import { PrintWorksheetView } from './components/PrintWorksheetView';
+import { getNormalizedScope, updateHeaderScope } from './utils/scopeUtils';
+
+import { ProximalExtensionPromptBanner } from './components/ProximalExtensionPromptBanner';
+import { SymptomSiteSection } from './components/SymptomSiteSection';
+import { ExamExtentSection } from './components/ExamExtentSection';
+import { ClinicalCommunicationSection } from './components/ClinicalCommunicationSection';
+import { AnatomicalVariantsSection } from './components/AnatomicalVariantsSection';
 
 import { LayoutGrid, GitBranch } from 'lucide-react';
 
@@ -42,9 +51,54 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'worksheet' | 'summary' | 'comparison'>('worksheet');
   const [worksheetViewMode, setWorksheetViewMode] = useState<'matrix' | 'diagram'>('matrix');
   const [selectedVesselId, setSelectedVesselId] = useState<string | null>(null);
+  const [selectedVesselIds, setSelectedVesselIds] = useState<string[]>([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isNormalModalOpen, setIsNormalModalOpen] = useState<boolean>(false);
   const [copyNotification, setCopyNotification] = useState(false);
+
+  const scope = getNormalizedScope(examState.header);
+  const { rightLowerLimb, leftLowerLimb, iliocaval } = scope.regionsExamined;
+
+  const hasCFVThrombus =
+    examState.vesselFindings['right_CFV']?.status === 'abnormal' ||
+    examState.vesselFindings['left_CFV']?.status === 'abnormal';
+
+  const hasPositiveDvt = (Object.values(examState.vesselFindings) as VesselFinding[]).some(
+    (f) => f.status === 'abnormal'
+  );
+
+  const handleAddIliocavalScope = () => {
+    const currentScope = getNormalizedScope(examState.header);
+    const updatedScope = {
+      ...currentScope,
+      regionsExamined: {
+        ...currentScope.regionsExamined,
+        iliocaval: true
+      }
+    };
+    const updatedHeader = updateHeaderScope(examState.header, updatedScope);
+    setExamState((prev) => ({
+      ...prev,
+      header: updatedHeader
+    }));
+  };
+
+  const handleToggleSelectVessel = (vesselId: string) => {
+    setSelectedVesselIds((prev) =>
+      prev.includes(vesselId) ? prev.filter((id) => id !== vesselId) : [...prev, vesselId]
+    );
+    setSelectedVesselId(vesselId);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedVesselIds([]);
+    setSelectedVesselId(null);
+  };
+
+  const handleSelectGroup = (vesselIds: string[]) => {
+    setSelectedVesselIds(vesselIds);
+    if (vesselIds.length > 0) setSelectedVesselId(vesselIds[0]);
+  };
 
   const handleOpenDetailModal = (vesselId: string) => {
     setSelectedVesselId(vesselId);
@@ -64,10 +118,15 @@ export const App: React.FC = () => {
     examState.vesselFindings,
     examState.header,
     examState.history,
+    examState.symptomSite,
+    examState.examExtent,
     examState.limitations,
     examState.doppler,
+    examState.contralateralCFVAssessment,
     examState.pelvic,
+    examState.clinicalCommunication,
     examState.otherFindings,
+    examState.anatomicalVariants,
     examState.comparisons,
     examState.userSummaryEdited
   ]);
@@ -291,6 +350,13 @@ export const App: React.FC = () => {
         {/* Tab 1: Interactive Worksheet & Anatomical Mapping */}
         {activeTab === 'worksheet' && (
           <div className="space-y-4">
+            {/* Requirement 2: Proximal Extension Prompt Banner */}
+            <ProximalExtensionPromptBanner
+              hasCFVThrombus={hasCFVThrombus}
+              isIliocavalInScope={iliocaval}
+              onAddIliocavalScope={handleAddIliocavalScope}
+            />
+
             {/* Persistent Abnormal Findings Summary Panel */}
             <AbnormalFindingsPanel
               vesselFindings={examState.vesselFindings}
@@ -351,44 +417,159 @@ export const App: React.FC = () => {
                 onMarkRoutineBilateralNormal={handleMarkRoutineBilateralNormal}
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                {/* Left Column: Right Limb Vessel Tree */}
-                <div className="lg:col-span-3 h-[680px]">
-                  <VesselTreeList
-                    side="right"
-                    vesselFindings={examState.vesselFindings}
-                    selectedVesselId={selectedVesselId}
-                    onSelectVessel={setSelectedVesselId}
-                    onUpdateStatus={handleUpdateVesselStatus}
-                    onOpenDetailModal={handleOpenDetailModal}
-                  />
-                </div>
+              <div className="space-y-4">
+                {/* 1. Iliocaval Diagram & Pelvic Tree List if Pelvic/Iliocaval region selected */}
+                {iliocaval && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                    <div className="lg:col-span-4 h-[680px]">
+                      <PelvicVesselTreeList
+                        vesselFindings={examState.vesselFindings}
+                        selectedVesselId={selectedVesselId}
+                        selectedVesselIds={selectedVesselIds}
+                        onSelectVessel={setSelectedVesselId}
+                        onUpdateStatus={handleUpdateVesselStatus}
+                        onOpenDetailModal={handleOpenDetailModal}
+                      />
+                    </div>
+                    <div className="lg:col-span-8 h-[680px]">
+                      <IliocavalDiagram
+                        vesselFindings={examState.vesselFindings}
+                        selectedVesselId={selectedVesselId}
+                        selectedVesselIds={selectedVesselIds}
+                        onToggleSelectVessel={handleToggleSelectVessel}
+                        onSelectVessel={setSelectedVesselId}
+                        onQuickToggleStatus={handleUpdateVesselStatus}
+                        onBatchUpdateFindings={handleBatchUpdateVessels}
+                        onOpenDetailModal={handleOpenDetailModal}
+                      />
+                    </div>
+                  </div>
+                )}
 
-                {/* Center Column: Interactive Diagram */}
-                <div className="lg:col-span-6 h-[680px]">
-                  <AnatomicalDiagram
-                    vesselFindings={examState.vesselFindings}
-                    selectedVesselId={selectedVesselId}
-                    onSelectVessel={setSelectedVesselId}
-                    onQuickToggleStatus={handleUpdateVesselStatus}
-                    onBatchUpdateFindings={handleBatchUpdateVessels}
-                    onOpenDetailModal={handleOpenDetailModal}
-                  />
-                </div>
+                {/* 2. Lower Limb Diagrams & Trees based on selected limbs */}
+                {(rightLowerLimb || leftLowerLimb) && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                    {/* Both Limbs Examined */}
+                    {rightLowerLimb && leftLowerLimb && (
+                      <>
+                        <div className="lg:col-span-3 h-[680px]">
+                          <VesselTreeList
+                            side="right"
+                            includePelvic={iliocaval}
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            onSelectVessel={setSelectedVesselId}
+                            onUpdateStatus={handleUpdateVesselStatus}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                        <div className="lg:col-span-6 h-[680px]">
+                          <AnatomicalDiagram
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            onToggleSelectVessel={handleToggleSelectVessel}
+                            onClearSelection={handleClearSelection}
+                            onSelectGroup={handleSelectGroup}
+                            onSelectVessel={setSelectedVesselId}
+                            onQuickToggleStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                        <div className="lg:col-span-3 h-[680px]">
+                          <VesselTreeList
+                            side="left"
+                            includePelvic={iliocaval}
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            onSelectVessel={setSelectedVesselId}
+                            onUpdateStatus={handleUpdateVesselStatus}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                      </>
+                    )}
 
-                {/* Right Column: Left Limb Vessel Tree */}
-                <div className="lg:col-span-3 h-[680px]">
-                  <VesselTreeList
-                    side="left"
-                    vesselFindings={examState.vesselFindings}
-                    selectedVesselId={selectedVesselId}
-                    onSelectVessel={setSelectedVesselId}
-                    onUpdateStatus={handleUpdateVesselStatus}
-                    onOpenDetailModal={handleOpenDetailModal}
-                  />
-                </div>
+                    {/* Right Limb ONLY */}
+                    {rightLowerLimb && !leftLowerLimb && (
+                      <>
+                        <div className="lg:col-span-4 h-[680px]">
+                          <VesselTreeList
+                            side="right"
+                            includePelvic={iliocaval}
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            onSelectVessel={setSelectedVesselId}
+                            onUpdateStatus={handleUpdateVesselStatus}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                        <div className="lg:col-span-8 h-[680px]">
+                          <AnatomicalDiagram
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            onToggleSelectVessel={handleToggleSelectVessel}
+                            onClearSelection={handleClearSelection}
+                            onSelectGroup={handleSelectGroup}
+                            onSelectVessel={setSelectedVesselId}
+                            onQuickToggleStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Left Limb ONLY */}
+                    {!rightLowerLimb && leftLowerLimb && (
+                      <>
+                        <div className="lg:col-span-8 h-[680px]">
+                          <AnatomicalDiagram
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            selectedVesselIds={selectedVesselIds}
+                            onToggleSelectVessel={handleToggleSelectVessel}
+                            onClearSelection={handleClearSelection}
+                            onSelectGroup={handleSelectGroup}
+                            onSelectVessel={setSelectedVesselId}
+                            onQuickToggleStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                        <div className="lg:col-span-4 h-[680px]">
+                          <VesselTreeList
+                            side="left"
+                            includePelvic={iliocaval}
+                            vesselFindings={examState.vesselFindings}
+                            selectedVesselId={selectedVesselId}
+                            onSelectVessel={setSelectedVesselId}
+                            onUpdateStatus={handleUpdateVesselStatus}
+                            onOpenDetailModal={handleOpenDetailModal}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Requirement 4: Site of Symptoms */}
+            <SymptomSiteSection
+              symptomSite={examState.symptomSite}
+              onChangeSymptomSite={(symptomSite) => setExamState({ ...examState, symptomSite })}
+            />
+
+            {/* Requirement 5: Actual Examination Extent */}
+            <ExamExtentSection
+              examExtent={examState.examExtent}
+              regionsExamined={scope.regionsExamined}
+              studyType={scope.studyType}
+              onChangeExtent={(examExtent) => setExamState({ ...examState, examExtent })}
+            />
 
             {/* Collapsible Clinical Details Sections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -403,14 +584,39 @@ export const App: React.FC = () => {
               />
             </div>
 
+            {/* Requirement 1 & 3: Spectral Doppler & Contralateral CFV */}
             <DopplerSection
               doppler={examState.doppler}
+              regionsExamined={scope.regionsExamined}
+              contralateralCFVAssessment={examState.contralateralCFVAssessment}
+              hasPositiveDvt={hasPositiveDvt}
               onChangeDoppler={(doppler) => setExamState({ ...examState, doppler })}
+              onChangeContralateralCFV={(cCFV) =>
+                setExamState({ ...examState, contralateralCFVAssessment: cCFV })
+              }
             />
 
+            {/* Requirement 8: Anatomical Variants & Duplicated Veins */}
+            <AnatomicalVariantsSection
+              variants={examState.anatomicalVariants || []}
+              onChangeVariants={(anatomicalVariants) =>
+                setExamState({ ...examState, anatomicalVariants })
+              }
+            />
+
+            {/* Requirement 7: Non-Venous & Other Findings */}
             <OtherFindingsSection
               otherFindings={examState.otherFindings}
               onChangeOtherFindings={(otherFindings) => setExamState({ ...examState, otherFindings })}
+            />
+
+            {/* Requirement 6: Positive Finding Clinical Communication */}
+            <ClinicalCommunicationSection
+              hasPositiveDvt={hasPositiveDvt}
+              communication={examState.clinicalCommunication}
+              onChangeCommunication={(clinicalCommunication) =>
+                setExamState({ ...examState, clinicalCommunication })
+              }
             />
           </div>
         )}

@@ -1,8 +1,8 @@
 // Ultrasound DVT Examination Vessel Matrix View Component
 
 import React from 'react';
-import { VesselFinding, VesselStatus, Side } from '../types/dvt';
-import { CheckCircle2, AlertTriangle, HelpCircle, Edit3, Zap, ShieldCheck } from 'lucide-react';
+import { VesselFinding, VesselStatus, Side, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
+import { CheckCircle2, AlertTriangle, HelpCircle, Edit3, Zap, ShieldCheck, EyeOff } from 'lucide-react';
 
 interface VesselMatrixViewProps {
   vesselFindings: Record<string, VesselFinding>;
@@ -285,19 +285,24 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
               </span>
             )}
             {status === 'not_visualised' && (
-              <span className="flex items-center gap-1 text-amber-400/90 font-medium text-xs">
-                <HelpCircle className="w-3 h-3" />
-                <span>N/V</span>
+              <span className="flex items-center gap-1 text-amber-400 font-medium text-xs">
+                <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                <span>Not Visualised</span>
               </span>
             )}
             {status === 'not_assessed' && (
-              <span className="text-slate-500 font-medium text-xs">Not Assessed</span>
+              <span className="text-slate-500 font-medium text-xs italic">Not Examined</span>
             )}
 
             {/* Quick Thrombus Tag if Abnormal */}
             {status === 'abnormal' && (
               <span className="text-[10px] text-rose-300 font-mono truncate max-w-[120px] hidden lg:inline">
                 ({finding.patency?.replace(/_/g, ' ') || 'thrombus'})
+              </span>
+            )}
+            {status === 'not_visualised' && (
+              <span className="text-[10px] text-amber-300/90 truncate max-w-[150px] hidden lg:inline font-medium">
+                ({NON_VISUALIZATION_REASON_LABELS[finding.nonVisualizationReason || 'body_habitus']})
               </span>
             )}
           </div>
@@ -465,8 +470,13 @@ export const VesselMatrixView: React.FC<VesselMatrixViewProps> = ({
                               <AlertTriangle className="w-3.5 h-3.5" /> Abnormal Thrombus Present
                             </span>
                           )}
-                          {status === 'not_visualised' && <span className="text-amber-400 font-medium">Not Visualised</span>}
-                          {status === 'not_assessed' && <span className="text-slate-500 italic">Not Assessed (Optional)</span>}
+                          {status === 'not_visualised' && (
+                            <span className="text-amber-400 font-medium flex items-center gap-1">
+                              <EyeOff className="w-3.5 h-3.5" />
+                              Not Visualised ({NON_VISUALIZATION_REASON_LABELS[finding?.nonVisualizationReason || 'body_habitus']})
+                            </span>
+                          )}
+                          {status === 'not_assessed' && <span className="text-slate-500 italic">Not Examined</span>}
                         </div>
 
                         <div className="flex items-center gap-1.5">

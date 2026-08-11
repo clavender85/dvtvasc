@@ -1,10 +1,11 @@
 // Examination Header & Quick Toolbar Component
 
 import React from 'react';
-import { PatientHeader, ExamType, ValidationAlert } from '../types/dvt';
+import { PatientHeader, ExamType, ValidationAlert, StudyType } from '../types/dvt';
 import { CLINICAL_INDICATIONS } from '../data/anatomyData';
 import { DEMO_CASES } from '../data/demoCases';
-import { CheckCircle2, AlertTriangle, Printer, Copy, Save, RotateCcw, ShieldCheck, FileText } from 'lucide-react';
+import { getNormalizedScope, updateHeaderScope } from '../utils/scopeUtils';
+import { CheckCircle2, AlertTriangle, Printer, Copy, Save, RotateCcw, ShieldCheck, FileText, CheckSquare, Square } from 'lucide-react';
 
 interface HeaderBarProps {
   header: PatientHeader;
@@ -37,6 +38,27 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   activeTab,
   setActiveTab
 }) => {
+  const scope = getNormalizedScope(header);
+
+  const handleStudyTypeChange = (studyType: StudyType) => {
+    const nextScope = { ...scope, studyType };
+    onChangeHeader(updateHeaderScope(header, nextScope));
+  };
+
+  const handleRegionToggle = (regionKey: 'rightLowerLimb' | 'leftLowerLimb' | 'iliocaval') => {
+    const nextRegions = {
+      ...scope.regionsExamined,
+      [regionKey]: !scope.regionsExamined[regionKey]
+    };
+    const nextScope = { ...scope, regionsExamined: nextRegions };
+    onChangeHeader(updateHeaderScope(header, nextScope));
+  };
+
+  const handlePresetScope = (r: { rightLowerLimb: boolean; leftLowerLimb: boolean; iliocaval: boolean }) => {
+    const nextScope = { ...scope, regionsExamined: r };
+    onChangeHeader(updateHeaderScope(header, nextScope));
+  };
+
   const handleIndicationToggle = (ind: string) => {
     const current = header.indications || [];
     const next = current.includes(ind) ? current.filter((i) => i !== ind) : [...current, ind];
@@ -203,10 +225,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           </div>
         </div>
 
-        {/* Sonographer & Exam Type */}
+        {/* Sonographer & Study Type */}
         <div className="space-y-1.5">
           <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Sonographer & Scope
+            Sonographer & Study Type
           </label>
           <input
             type="text"
@@ -215,19 +237,110 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             onChange={(e) => onChangeHeader({ ...header, sonographer: e.target.value })}
             className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 focus:border-teal-500 focus:outline-none"
           />
-          <select
-            value={header.examType}
-            onChange={(e) => onChangeHeader({ ...header, examType: e.target.value as ExamType })}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 focus:border-teal-500 focus:outline-none font-medium text-teal-300"
-          >
-            <option value="Right lower limb">Right lower limb</option>
-            <option value="Left lower limb">Left lower limb</option>
-            <option value="Bilateral lower limbs">Bilateral lower limbs</option>
-            <option value="Pelvic/iliocaval assessment">Pelvic/iliocaval assessment</option>
-            <option value="Limited DVT study">Limited DVT study</option>
-            <option value="Follow-up known DVT">Follow-up known DVT</option>
-            <option value="Other">Other</option>
-          </select>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-400 font-medium">Study Type:</span>
+            <select
+              value={scope.studyType}
+              onChange={(e) => handleStudyTypeChange(e.target.value as StudyType)}
+              className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 focus:border-teal-500 focus:outline-none text-xs font-semibold text-teal-300"
+            >
+              <option value="Routine DVT study">Routine DVT study</option>
+              <option value="Follow-up known DVT">Follow-up known DVT</option>
+              <option value="Limited DVT study">Limited DVT study</option>
+              <option value="Targeted / Problem-solving">Targeted / Problem-solving</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Anatomical Regions Examined */}
+        <div className="space-y-1.5">
+          <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Anatomical Regions Examined
+          </label>
+          <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-1.5 rounded border border-slate-800">
+            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-200 hover:text-teal-300">
+              <input
+                type="checkbox"
+                checked={scope.regionsExamined.rightLowerLimb}
+                onChange={() => handleRegionToggle('rightLowerLimb')}
+                className="accent-teal-500 rounded"
+              />
+              Right Leg
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-slate-200 hover:text-teal-300">
+              <input
+                type="checkbox"
+                checked={scope.regionsExamined.leftLowerLimb}
+                onChange={() => handleRegionToggle('leftLowerLimb')}
+                className="accent-teal-500 rounded"
+              />
+              Left Leg
+            </label>
+            <label className="flex items-center gap-1 cursor-pointer text-xs font-medium text-amber-200 hover:text-amber-100">
+              <input
+                type="checkbox"
+                checked={scope.regionsExamined.iliocaval}
+                onChange={() => handleRegionToggle('iliocaval')}
+                className="accent-amber-500 rounded"
+              />
+              Iliocaval / Pelvic
+            </label>
+          </div>
+
+          {/* Quick Scope Presets */}
+          <div className="flex flex-wrap gap-1 text-[10px]">
+            <span className="text-slate-500 font-medium">Presets:</span>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: true, leftLowerLimb: false, iliocaval: false })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+            >
+              Right
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: false, leftLowerLimb: true, iliocaval: false })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+            >
+              Left
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: true, leftLowerLimb: true, iliocaval: false })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+            >
+              Bilateral
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: true, leftLowerLimb: false, iliocaval: true })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+            >
+              R + Iliocaval
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: false, leftLowerLimb: true, iliocaval: true })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+            >
+              L + Iliocaval
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: true, leftLowerLimb: true, iliocaval: true })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold"
+            >
+              Bilat + Iliocaval
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetScope({ rightLowerLimb: false, leftLowerLimb: false, iliocaval: true })}
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold"
+            >
+              Iliocaval Only
+            </button>
+          </div>
         </div>
 
         {/* Clinical Indications Pills */}

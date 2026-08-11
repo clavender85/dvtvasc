@@ -1,8 +1,9 @@
 // Structured Sonographer Findings Summary Generator
 
-import { ExamState, VesselFinding, Side, SonographicChronicity, Patency, Compressibility } from '../types/dvt';
+import { ExamState, VesselFinding, Side, SonographicChronicity, Patency, Compressibility, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
 import { generateIntervalComparisonSummary, generateKeyComparisonFinding } from './comparisonEngine';
+import { getNormalizedScope } from './scopeUtils';
 
 function formatExtent(f: VesselFinding): string {
   if (!f.proximalExtent?.distance && !f.distalExtent?.distance) return '';
@@ -86,6 +87,31 @@ export function generateSonographerSummary(state: ExamState): string {
   if (header.clinicalHistory) {
     lines.push(`CLINICAL HISTORY: ${header.clinicalHistory}`);
   }
+
+  // Symptom Site
+  if (state.symptomSite) {
+    const ss = state.symptomSite;
+    let sStr = `SITE OF SYMPTOMS: ${ss.side} lower limb`;
+    if (ss.regions && ss.regions.length > 0) {
+      sStr += ` (${ss.regions.join(', ')})`;
+    }
+    if (ss.focalAreaAssessed) {
+      sStr += `. Focal symptomatic area assessed: ${ss.focalFinding}`;
+    }
+    if (ss.comments) sStr += `. ${ss.comments}`;
+    lines.push(sStr);
+  }
+
+  // Exam Extent
+  if (state.examExtent) {
+    const ext = state.examExtent;
+    if (ext.right) {
+      lines.push(`RIGHT ANATOMICAL EXTENT: Examined from ${ext.right.upperExtent} to ${ext.right.lowerExtent}.`);
+    }
+    if (ext.left) {
+      lines.push(`LEFT ANATOMICAL EXTENT: Examined from ${ext.left.upperExtent} to ${ext.left.lowerExtent}.`);
+    }
+  }
   lines.push('');
 
   // 2. Prior Study Header if present
@@ -107,15 +133,12 @@ export function generateSonographerSummary(state: ExamState): string {
     lines.push('');
   }
 
+  const scope = getNormalizedScope(header);
+
   // Helper to compile findings for a specific side
   const processLimb = (side: Side, sideLabel: string) => {
     // Check if this limb was part of the examination scope
-    const isExamined =
-      header.examType === 'Bilateral lower limbs' ||
-      (header.examType === 'Right lower limb' && side === 'right') ||
-      (header.examType === 'Left lower limb' && side === 'left') ||
-      header.examType === 'Follow-up known DVT' ||
-      header.examType === 'Limited DVT study';
+    const isExamined = side === 'right' ? scope.regionsExamined.rightLowerLimb : scope.regionsExamined.leftLowerLimb;
 
     lines.push(`=== ${sideLabel.toUpperCase()} LOWER LIMB ===`);
 
@@ -147,9 +170,14 @@ export function generateSonographerSummary(state: ExamState): string {
     // Deep Vein Summary Statement
     if (abnormalDeep.length === 0) {
       if (unvisualisedDeep.length > 0) {
-        const unvisNames = unvisualisedDeep.map((v) => v.vesselName).join(', ');
+        const unvisList = unvisualisedDeep.map((v) => {
+          const reasonKey = v.nonVisualizationReason || 'body_habitus';
+          const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'technical limitation';
+          const custom = v.customNonVisualizationReason ? ` - ${v.customNonVisualizationReason}` : '';
+          return `${v.vesselName} (${reasonLabel}${custom})`;
+        }).join(', ');
         lines.push(
-          `Deep veins assessed from CFV to calf show normal compressibility and patency. Note: The following vessel(s) could not be adequately visualised: ${unvisNames}.`
+          `Deep veins assessed from CFV to calf show normal compressibility and patency. Note: The following vessel(s) could not be adequately visualised: ${unvisList}.`
         );
       } else {
         lines.push(
@@ -172,6 +200,16 @@ export function generateSonographerSummary(state: ExamState): string {
         if (f.comments) line += ` Note: ${f.comments}`;
         lines.push(line);
       });
+
+      if (unvisualisedDeep.length > 0) {
+        const unvisList = unvisualisedDeep.map((v) => {
+          const reasonKey = v.nonVisualizationReason || 'body_habitus';
+          const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'technical limitation';
+          const custom = v.customNonVisualizationReason ? ` - ${v.customNonVisualizationReason}` : '';
+          return `${v.vesselName} (${reasonLabel}${custom})`;
+        }).join(', ');
+        lines.push(`Note: The following additional deep vessel(s) could not be adequately visualised: ${unvisList}.`);
+      }
     }
 
     // Muscular Calf Veins
@@ -207,9 +245,33 @@ export function generateSonographerSummary(state: ExamState): string {
   processLimb('right', 'Right');
   processLimb('left', 'Left');
 
-  // 4. Pelvic Assessment
+  // Contralateral CFV Assessment in Unilateral Study
+  if (state.contralateralCFVAssessment) {
+    const cCFV = state.contralateralCFVAssessment;
+    lines.push(`=== CONTRALATERAL (${cCFV.side.toUpperCase()}) CFV ASSESSMENT ===`);
+    lines.push(`Contralateral ${cCFV.side} Common Femoral Vein Doppler: ${cCFV.phasicity.replace(/_/g, ' ')}.`);
+    if (cCFV.comments) lines.push(`Comments: ${cCFV.comments}`);
+    lines.push('Note: This spot Doppler assessment does NOT represent a complete contralateral lower limb examination.');
+    lines.push('');
+  }
+
+  // Anatomical Variants
+  if (state.anatomicalVariants && state.anatomicalVariants.length > 0) {
+    lines.push('=== ANATOMICAL VARIANTS & DUPLICATED VEINS ===');
+    state.anatomicalVariants.forEach((v) => {
+      let vStr = `• ${v.side} ${v.variantType}`;
+      if (v.variantType.includes('Duplicated')) {
+        vStr += `: Channel 1 status = ${v.channel1Status.replace(/_/g, ' ')}, Channel 2 status = ${(v.channel2Status || 'normal').replace(/_/g, ' ')}`;
+      }
+      if (v.comments) vStr += `. ${v.comments}`;
+      lines.push(vStr);
+    });
+    lines.push('');
+  }
+
+  // 4. Pelvic / Iliocaval Assessment
   if (
-    header.examType === 'Pelvic/iliocaval assessment' ||
+    scope.regionsExamined.iliocaval ||
     pelvic.ivcVisualised !== 'not_visualised' ||
     pelvic.civRightStatus !== 'not_visualised' ||
     pelvic.civLeftStatus !== 'not_visualised'
@@ -254,8 +316,24 @@ export function generateSonographerSummary(state: ExamState): string {
   if (otherFindings.length > 0) {
     lines.push('=== OTHER / NON-VENOUS FINDINGS ===');
     otherFindings.forEach((of) => {
-      lines.push(`• ${of.side} ${of.type}: Located at ${of.location}.${of.dimensions ? ` Dimensions: ${of.dimensions}.` : ''} ${of.comments}`);
+      let dimText = '';
+      if (of.dimensionsLengthMm || of.dimensionsWidthMm || of.dimensionsDepthMm) {
+        dimText = ` Dimensions: ${of.dimensionsLengthMm ?? '-'} x ${of.dimensionsWidthMm ?? '-'} x ${of.dimensionsDepthMm ?? '-'} mm.`;
+      } else if (of.dimensionsText) {
+        dimText = ` Dimensions: ${of.dimensionsText}.`;
+      }
+      lines.push(`• ${of.side} ${of.type}: Located at ${of.location}.${dimText} ${of.comments}`);
     });
+    lines.push('');
+  }
+
+  // Clinical Communication
+  if (state.clinicalCommunication && state.clinicalCommunication.contacted !== 'Not required under local protocol') {
+    const cc = state.clinicalCommunication;
+    lines.push('=== CLINICAL COMMUNICATION ===');
+    lines.push(`Direct Contact Completed: ${cc.contacted}. Contact: ${cc.contactNameRole || 'Not specified'} (${cc.method || 'Phone'}, ${cc.dateTime}).`);
+    if (cc.outcomeInstructions) lines.push(`Instructions / Outcome: ${cc.outcomeInstructions}`);
+    if (cc.patientDisposition) lines.push(`Patient Disposition: ${cc.patientDisposition}`);
     lines.push('');
   }
 
@@ -296,6 +374,11 @@ export function generateSonographerSummary(state: ExamState): string {
   if (doppler.rightCFVPhasicity === 'reduced_phasicity' || doppler.leftCFVPhasicity === 'reduced_phasicity') {
     lines.push('2. Reduced common femoral vein respiratory phasicity noted. Recommend correlation for proximal pelvic compression if clinically warranted.');
   }
+
+  lines.push('');
+  lines.push('--------------------------------------------------------------------------------');
+  lines.push('SONOGRAPHER WORKSHEET / PRELIMINARY FINDINGS DOCUMENTATION — NOT THE FINAL DIAGNOSTIC REPORT.');
+  lines.push('--------------------------------------------------------------------------------');
 
   return lines.join('\n');
 }

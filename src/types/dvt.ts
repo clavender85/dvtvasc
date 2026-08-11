@@ -100,6 +100,31 @@ export interface ExtentLandmark {
   customLandmark?: string;
 }
 
+export type NonVisualizationReason =
+  | 'body_habitus'
+  | 'severe_edema'
+  | 'dressing_bandage_cast'
+  | 'bowel_gas'
+  | 'deep_location'
+  | 'vessel_spasm_hypoplasia'
+  | 'acoustic_shadowing_calcification'
+  | 'overlying_wound_ulcer'
+  | 'patient_pain_movement'
+  | 'technical_limitation_other';
+
+export const NON_VISUALIZATION_REASON_LABELS: Record<NonVisualizationReason, string> = {
+  body_habitus: 'Body Habitus / Deep Tissue Depth',
+  severe_edema: 'Severe Subcutaneous Edema',
+  dressing_bandage_cast: 'Bandage / Cast / Surgical Dressing',
+  bowel_gas: 'Overlying Bowel Gas Shadowing',
+  deep_location: 'Deep Anatomical Location / Technical Limitation',
+  vessel_spasm_hypoplasia: 'Vessel Spasm / Small Calibre',
+  acoustic_shadowing_calcification: 'Heavy Calcification / Acoustic Shadowing',
+  overlying_wound_ulcer: 'Overlying Wound / Open Ulceration',
+  patient_pain_movement: 'Patient Pain / Movement',
+  technical_limitation_other: 'Other Technical Limitation'
+};
+
 export type Continuity = 'continuous' | 'discontinuous_segmental' | 'multiple_separate';
 
 export interface VesselFinding {
@@ -111,6 +136,10 @@ export interface VesselFinding {
   pairedSubtype?: 'both' | 'medial_member1' | 'lateral_member2';
   
   status: VesselStatus;
+
+  // Non-visualization details
+  nonVisualizationReason?: NonVisualizationReason;
+  customNonVisualizationReason?: string;
   
   // Abnormal details
   thrombusPresence?: ThrombusPresence;
@@ -137,7 +166,100 @@ export interface VesselFinding {
 }
 
 export type PhasicityOption = 'phasic' | 'reduced_phasicity' | 'continuous_non_phasic' | 'pulsatile' | 'not_assessed';
-export type AugmentationOption = 'normal_augmentation' | 'reduced_augmentation' | 'absent_augmentation' | 'not_performed' | 'not_assessed';
+export type AugmentationOption =
+  | 'normal_augmentation'
+  | 'reduced_augmentation'
+  | 'absent_augmentation'
+  | 'performed_prior_to_dvt'
+  | 'not_performed_positive_dvt'
+  | 'not_performed'
+  | 'not_assessed';
+
+export type ContralateralPhasicity =
+  | 'phasic_preserved'
+  | 'reduced_phasicity'
+  | 'continuous_non_phasic'
+  | 'pulsatile'
+  | 'not_assessed'
+  | 'not_visualised';
+
+export interface ContralateralCFVAssessment {
+  side: 'right' | 'left';
+  phasicity: ContralateralPhasicity;
+  comments?: string;
+}
+
+export type SymptomSide = 'Right' | 'Left' | 'Bilateral' | 'Central';
+export type SymptomRegion =
+  | 'Groin'
+  | 'Thigh'
+  | 'Popliteal fossa'
+  | 'Calf'
+  | 'Ankle'
+  | 'Generalised leg'
+  | 'Other';
+
+export type SymptomFocalFinding =
+  | 'No focal abnormality'
+  | 'Corresponds to DVT'
+  | 'Superficial thrombosis'
+  | "Baker's cyst"
+  | 'Haematoma'
+  | 'Collection'
+  | 'Oedema'
+  | 'Varicosity'
+  | 'Other';
+
+export interface SymptomSiteAssessment {
+  side: SymptomSide;
+  regions: SymptomRegion[];
+  focalAreaAssessed: boolean;
+  focalFinding?: SymptomFocalFinding;
+  comments?: string;
+}
+
+export type UpperExtent = 'IVC' | 'Common iliac' | 'External iliac' | 'CFV / groin' | 'Other';
+export type LowerExtent = 'Knee' | 'Proximal calf' | 'Mid calf' | 'Ankle' | 'Other';
+
+export interface LegExamExtent {
+  upperExtent: UpperExtent;
+  lowerExtent: LowerExtent;
+  customUpperExtent?: string;
+  customLowerExtent?: string;
+}
+
+export interface ExamExtentState {
+  right?: LegExamExtent;
+  left?: LegExamExtent;
+}
+
+export interface ClinicalCommunication {
+  contacted: 'Yes' | 'No' | 'Not required under local protocol';
+  contactNameRole?: string;
+  dateTime?: string;
+  method?: 'Phone' | 'In person' | 'Electronic message' | 'Other';
+  outcomeInstructions?: string;
+  patientDisposition?: string;
+}
+
+export type VariantType =
+  | 'Duplicated femoral vein'
+  | 'Duplicated popliteal vein'
+  | 'Variant calf venous anatomy'
+  | 'Absent / hypoplastic vein'
+  | 'Other';
+
+export interface AnatomicalVariantItem {
+  id: string;
+  side: 'Right' | 'Left' | 'Bilateral';
+  variantType: VariantType;
+  vesselKey: string;
+  channel1Status: VesselStatus;
+  channel1Finding?: Partial<VesselFinding>;
+  channel2Status?: VesselStatus;
+  channel2Finding?: Partial<VesselFinding>;
+  comments?: string;
+}
 
 export interface DopplerAssessment {
   rightCFVPhasicity: PhasicityOption;
@@ -159,6 +281,24 @@ export interface ExaminationLimitations {
   customDetails: string;
 }
 
+export type StudyType =
+  | 'Routine DVT study'
+  | 'Follow-up known DVT'
+  | 'Limited DVT study'
+  | 'Targeted / Problem-solving'
+  | 'Other';
+
+export interface RegionsExamined {
+  rightLowerLimb: boolean;
+  leftLowerLimb: boolean;
+  iliocaval: boolean;
+}
+
+export interface ExaminationScope {
+  studyType: StudyType;
+  regionsExamined: RegionsExamined;
+}
+
 export interface PatientHeader {
   patientId: string;
   patientName: string;
@@ -166,6 +306,7 @@ export interface PatientHeader {
   examDate: string;
   sonographer: string;
   examType: ExamType;
+  scope?: ExaminationScope;
   indications: string[];
   clinicalHistory: string;
 }
@@ -212,25 +353,23 @@ export interface PelvicAssessment {
 export interface OtherFindingItem {
   id: string;
   type:
-    | "Baker's cyst"
-    | "Ruptured Baker's cyst appearance"
-    | 'Oedema'
+    | "Baker's / popliteal cyst"
+    | "Suspected ruptured Baker's cyst"
     | 'Haematoma'
     | 'Collection'
-    | 'Lymph node'
-    | 'Superficial thrombophlebitis'
-    | 'Varicose veins'
-    | 'Venous aneurysm'
-    | 'Duplicated femoral vein'
-    | 'Duplicated popliteal vein'
-    | 'Anatomical variant'
-    | 'Absent/hypoplastic vessel'
+    | 'Oedema'
+    | 'Enlarged lymph node'
     | 'Collateral veins'
-    | 'Pulsatile venous flow'
+    | 'Superficial varicosities'
+    | 'Superficial thrombosis'
+    | 'Venous aneurysmal dilatation'
     | 'Other';
-  side: 'Right' | 'Left' | 'Bilateral';
+  side: 'Right' | 'Left' | 'Bilateral' | 'Pelvis';
   location: string;
-  dimensions?: string;
+  dimensionsLengthMm?: number | null;
+  dimensionsWidthMm?: number | null;
+  dimensionsDepthMm?: number | null;
+  dimensionsText?: string;
   comments: string;
 }
 
@@ -380,11 +519,16 @@ export interface ValidationAlert {
 export interface ExamState {
   header: PatientHeader;
   history: PreviousHistory;
+  symptomSite?: SymptomSiteAssessment;
+  examExtent?: ExamExtentState;
   limitations: ExaminationLimitations;
   vesselFindings: Record<string, VesselFinding>; // keyed by vesselId e.g. 'right_CFV'
   doppler: DopplerAssessment;
+  contralateralCFVAssessment?: ContralateralCFVAssessment;
   pelvic: PelvicAssessment;
+  clinicalCommunication?: ClinicalCommunication;
   otherFindings: OtherFindingItem[];
+  anatomicalVariants?: AnatomicalVariantItem[];
   comparisons: VesselComparison[];
   comparisonState?: ComparisonState;
   generatedSummary: string;

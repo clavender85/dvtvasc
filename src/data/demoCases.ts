@@ -450,10 +450,10 @@ export const DEMO_CASE_5_SUPERFICIAL_GSV: ExamState = {
   otherFindings: [
     {
       id: 'of-1',
-      type: 'Superficial thrombophlebitis',
+      type: 'Superficial thrombosis',
       side: 'Right',
       location: 'Medial thigh along proximal GSV',
-      dimensions: '15 cm segment',
+      dimensionsText: '15 cm segment',
       comments: 'Associated cutaneous thickening and non-compressible superficial varix.'
     }
   ]

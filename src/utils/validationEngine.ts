@@ -128,5 +128,36 @@ export function runValidationChecks(state: ExamState): ValidationAlert[] {
     }
   }
 
+  // Check 9: Routine segment completion check in examined scope
+  const { rightLowerLimb, leftLowerLimb } = state.header.scope?.regionsExamined || { rightLowerLimb: true, leftLowerLimb: true };
+  const unassessedRoutine: string[] = [];
+  
+  Object.values(state.vesselFindings).forEach((vf) => {
+    const isExaminedLeg = (vf.side === 'right' && rightLowerLimb) || (vf.side === 'left' && leftLowerLimb);
+    if (isExaminedLeg && vf.status === 'not_assessed') {
+      unassessedRoutine.push(vf.vesselName);
+    }
+  });
+
+  if (unassessedRoutine.length > 0) {
+    alerts.push({
+      id: 'alert-unassessed-routine',
+      severity: 'info',
+      title: 'Incomplete Segment Assessment',
+      message: `${unassessedRoutine.length} vessel segment(s) in examined leg scope remain unassessed (e.g., ${unassessedRoutine.slice(0, 3).join(', ')}). Consider completing or documenting technical limitation.`
+    });
+  }
+
+  // Check 10: Positive DVT Direct Communication Prompt
+  const hasDvt = Object.values(state.vesselFindings).some(vf => vf.status === 'abnormal');
+  if (hasDvt && state.clinicalCommunication?.contacted === 'No') {
+    alerts.push({
+      id: 'alert-comm-pending',
+      severity: 'warning',
+      title: 'Positive DVT — Direct Communication Pending',
+      message: 'Positive DVT documented with clinical direct contact recorded as "No (Urgent alert pending)". Please complete clinical communication details.'
+    });
+  }
+
   return alerts;
 }

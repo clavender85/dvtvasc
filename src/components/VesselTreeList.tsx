@@ -1,21 +1,22 @@
 // Grouped Vessel Tree List Component for Lower Limb DVT Worksheet
 
 import React from 'react';
-import { VesselFinding, VesselCategory, Side, VesselStatus } from '../types/dvt';
+import { VesselFinding, VesselCategory, Side, VesselStatus, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
 import { ANATOMICAL_VESSELS } from '../data/anatomyData';
-import { CheckCircle, AlertTriangle, HelpCircle, Edit3, ChevronRight } from 'lucide-react';
+import { CheckCircle, AlertTriangle, HelpCircle, Edit3, ChevronRight, EyeOff } from 'lucide-react';
 
 interface VesselTreeListProps {
   side: Side;
   vesselFindings: Record<string, VesselFinding>;
   selectedVesselId: string | null;
+  includePelvic?: boolean;
   onSelectVessel: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
   onOpenDetailModal?: (vesselId: string) => void;
 }
 
 const CATEGORY_LABELS: Record<VesselCategory, string> = {
-  pelvis: 'Pelvic / Proximal Veins',
+  pelvis: 'Pelvic & Iliac Veins (IVC, CIV, EIV, IIV)',
   thigh: 'Thigh Deep Veins',
   popliteal: 'Popliteal Fossa',
   calf_deep: 'Deep Calf Veins (Paired)',
@@ -23,18 +24,29 @@ const CATEGORY_LABELS: Record<VesselCategory, string> = {
   superficial: 'Superficial Venous System'
 };
 
-const CATEGORY_ORDER: VesselCategory[] = ['thigh', 'popliteal', 'calf_deep', 'muscular_calf', 'superficial'];
-
 export const VesselTreeList: React.FC<VesselTreeListProps> = ({
   side,
   vesselFindings,
   selectedVesselId,
+  includePelvic = false,
   onSelectVessel,
   onUpdateStatus,
   onOpenDetailModal
 }) => {
+  const [showPelvicLocal, setShowPelvicLocal] = React.useState<boolean>(includePelvic);
+
+  React.useEffect(() => {
+    if (includePelvic) {
+      setShowPelvicLocal(true);
+    }
+  }, [includePelvic]);
+
   const sideTitle = side === 'right' ? 'RIGHT LOWER LIMB' : 'LEFT LOWER LIMB';
   const themeColor = side === 'right' ? 'text-teal-400' : 'text-sky-400';
+
+  const activeCategoryOrder: VesselCategory[] = showPelvicLocal
+    ? ['pelvis', 'thigh', 'popliteal', 'calf_deep', 'muscular_calf', 'superficial']
+    : ['thigh', 'popliteal', 'calf_deep', 'muscular_calf', 'superficial'];
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col h-full">
@@ -43,12 +55,26 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
         <div className="flex items-center gap-2">
           <span className={`font-bold text-xs uppercase tracking-wider ${themeColor}`}>{sideTitle}</span>
         </div>
-        <span className="text-[10px] text-slate-400 uppercase tracking-wide">Vessel Findings</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPelvicLocal(!showPelvicLocal)}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-colors ${
+              showPelvicLocal
+                ? 'bg-amber-950/80 text-amber-300 border-amber-700'
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title="Toggle Pelvic / Iliac Veins & IVC"
+          >
+            {showPelvicLocal ? 'Pelvic: ON' : '+ Iliac/IVC'}
+          </button>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wide">Vessel Findings</span>
+        </div>
       </div>
 
       {/* Category Groups Container */}
       <div className="p-2 space-y-3 overflow-y-auto flex-1 max-h-[700px] text-xs">
-        {CATEGORY_ORDER.map((category) => {
+        {activeCategoryOrder.map((category) => {
           const vesselsInCategory = ANATOMICAL_VESSELS.filter((v) => v.category === category);
 
           return (
@@ -63,11 +89,21 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
               {/* Vessels List */}
               <div className="divide-y divide-slate-800/60">
                 {vesselsInCategory.map((vDef) => {
-                  const vesselId = `${side}_${vDef.vesselKey}`;
+                  const vesselId =
+                    vDef.category === 'pelvis' && vDef.vesselKey === 'IVC'
+                      ? 'pelvis_IVC'
+                      : `${side}_${vDef.vesselKey}`;
                   const finding = vesselFindings[vesselId];
                   const isSelected = selectedVesselId === vesselId;
 
                   if (!finding) return null;
+
+                  const displayName =
+                    vDef.category === 'pelvis'
+                      ? vDef.vesselKey === 'IVC'
+                        ? 'Inferior Vena Cava (IVC)'
+                        : `${side === 'right' ? 'Right' : 'Left'} ${vDef.shortName}`
+                      : vDef.shortName;
 
                   return (
                     <div
@@ -84,17 +120,26 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
                       <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => onSelectVessel(vesselId)}>
                         {finding.status === 'normal' && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
                         {finding.status === 'abnormal' && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 animate-pulse" />}
-                        {(finding.status === 'not_visualised' || finding.status === 'not_assessed') && (
-                          <HelpCircle className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                        )}
+                        {finding.status === 'not_visualised' && <EyeOff className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
+                        {finding.status === 'not_assessed' && <HelpCircle className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
 
                         <div className="truncate">
                           <span className={`font-semibold text-xs ${isSelected ? 'text-teal-300' : 'text-slate-200'}`}>
-                            {vDef.shortName}
+                            {displayName}
                           </span>
                           {finding.status === 'abnormal' && (
                             <div className="text-[10px] text-rose-300 truncate">
                               {finding.patency?.replace(/_/g, ' ')} • {finding.chronicity?.replace(/_/g, ' ')}
+                            </div>
+                          )}
+                          {finding.status === 'not_visualised' && (
+                            <div className="text-[10px] text-amber-300/90 truncate font-medium">
+                              NV: {NON_VISUALIZATION_REASON_LABELS[finding.nonVisualizationReason || 'body_habitus']}
+                            </div>
+                          )}
+                          {finding.status === 'not_assessed' && (
+                            <div className="text-[10px] text-slate-500 italic truncate">
+                              Not Examined
                             </div>
                           )}
                         </div>
@@ -138,13 +183,21 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => onUpdateStatus(vesselId, 'not_visualised')}
+                          onClick={() => {
+                            if (finding.status !== 'not_visualised') {
+                              onUpdateStatus(vesselId, 'not_visualised');
+                            }
+                            onSelectVessel(vesselId);
+                            if (onOpenDetailModal) {
+                              onOpenDetailModal(vesselId);
+                            }
+                          }}
                           className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
                             finding.status === 'not_visualised'
-                              ? 'bg-slate-700 text-slate-200'
+                              ? 'bg-amber-800 text-amber-100 ring-1 ring-amber-500'
                               : 'bg-slate-800 text-slate-500 hover:text-slate-300'
                           }`}
-                          title="Not Visualised"
+                          title="Not Visualised (Click to select reason)"
                         >
                           N/V
                         </button>

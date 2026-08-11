@@ -1,9 +1,9 @@
 // Detailed Vessel Abnormality Card & Editor Modal
 
 import React from 'react';
-import { VesselFinding, Compressibility, Patency, ThrombusEchogenicity, SonographicChronicity, MorphologyOption, Landmark } from '../types/dvt';
+import { VesselFinding, Compressibility, Patency, ThrombusEchogenicity, SonographicChronicity, MorphologyOption, Landmark, NonVisualizationReason, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
 import { LANDMARK_LABELS } from '../data/anatomyData';
-import { X, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, ShieldAlert, EyeOff, Info } from 'lucide-react';
 
 interface VesselDetailModalProps {
   finding: VesselFinding | null;
@@ -76,12 +76,12 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
             <label className="block text-slate-400 font-bold uppercase tracking-wider text-[11px] mb-1.5">
               Vessel Examination Status
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'normal', label: 'Normal / Clear' },
                 { id: 'abnormal', label: 'Abnormal / Thrombus' },
-                { id: 'not_visualised', label: 'Not Visualised' },
-                { id: 'not_assessed', label: 'Not Assessed' }
+                { id: 'not_visualised', label: 'Not Visualised (NV)' },
+                { id: 'not_assessed', label: 'Not Examined (NA)' }
               ].map((st) => (
                 <button
                   key={st.id}
@@ -90,18 +90,21 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
                     onSaveFinding({
                       ...finding,
                       status: st.id as any,
+                      nonVisualizationReason: st.id === 'not_visualised' ? (finding.nonVisualizationReason || 'body_habitus') : finding.nonVisualizationReason,
                       thrombusPresence: st.id === 'abnormal' ? 'thrombus_present' : undefined,
                       compressibility: st.id === 'normal' ? 'fully_compressible' : 'non_compressible',
                       patency: st.id === 'normal' ? 'patent' : 'completely_occluded',
                       chronicity: st.id === 'abnormal' ? 'acute_appearing' : undefined
                     })
                   }
-                  className={`py-2 rounded-lg font-semibold border text-center transition-all ${
+                  className={`py-2 px-2 rounded-lg font-semibold border text-center transition-all ${
                     finding.status === st.id
                       ? st.id === 'normal'
-                        ? 'bg-emerald-700 border-emerald-500 text-white'
+                        ? 'bg-emerald-700 border-emerald-500 text-white shadow-md'
                         : st.id === 'abnormal'
                         ? 'bg-rose-700 border-rose-500 text-white shadow-lg'
+                        : st.id === 'not_visualised'
+                        ? 'bg-amber-800 border-amber-600 text-amber-100 shadow-md'
                         : 'bg-slate-700 border-slate-500 text-white'
                       : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
                   }`}
@@ -111,6 +114,67 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Reason for Non-Visualization Panel */}
+          {finding.status === 'not_visualised' && (
+            <div className="p-4 bg-amber-950/40 border border-amber-700/60 rounded-xl space-y-3 animate-fadeIn">
+              <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                <EyeOff className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>Reason for Non-Visualization (NV)</span>
+              </div>
+              <p className="text-slate-300 text-xs">
+                An attempt was made to examine this vessel, but it could not be visualised. Please select the primary sonographic or technical limitation:
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-amber-200 font-semibold mb-1">Limitation Reason</label>
+                  <select
+                    value={finding.nonVisualizationReason || 'body_habitus'}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        nonVisualizationReason: e.target.value as NonVisualizationReason
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-amber-700/80 rounded-lg px-2.5 py-1.5 text-amber-100 font-medium focus:ring-1 focus:ring-amber-500"
+                  >
+                    {Object.entries(NON_VISUALIZATION_REASON_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Additional Detail / Custom Reason</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Plaster cast above knee, severe edema, open dressing..."
+                    value={finding.customNonVisualizationReason || ''}
+                    onChange={(e) =>
+                      onSaveFinding({
+                        ...finding,
+                        customNonVisualizationReason: e.target.value
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium placeholder-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Not Examined / Out of Protocol Scope Panel */}
+          {finding.status === 'not_assessed' && (
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-2.5 text-slate-300 text-xs">
+              <Info className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <span>
+                <strong className="text-slate-200">Not Examined / Not Assessed (NA):</strong> This vessel segment was omitted or out of scope for the routine ultrasound protocol.
+              </span>
+            </div>
+          )}
 
           {/* Expanded Abnormality Section */}
           {finding.status === 'abnormal' && (

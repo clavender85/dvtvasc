@@ -15,7 +15,7 @@ export const PrintWorksheetView: React.FC<PrintWorksheetViewProps> = ({ state, s
   return (
     <div className="print-worksheet hidden print:block bg-white text-black p-8 font-sans max-w-4xl mx-auto leading-normal text-xs">
       {/* Header Banner */}
-      <div className="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-end">
+      <div className="border-b-2 border-slate-900 pb-3 mb-2 flex justify-between items-end">
         <div>
           <h1 className="text-xl font-bold uppercase tracking-wide text-slate-900">
             VENOUS DUPLEX ULTRASOUND EXAMINATION WORKSHEET
@@ -26,6 +26,11 @@ export const PrintWorksheetView: React.FC<PrintWorksheetViewProps> = ({ state, s
           <div>Document ID: DVT-WS-{header.patientId || 'DRAFT'}</div>
           <div>Date: {header.examDate}</div>
         </div>
+      </div>
+
+      {/* Requirement 11: Top Disclaimer Banner */}
+      <div className="bg-amber-100 border border-amber-400 text-amber-900 p-2 rounded text-center font-bold text-[11px] mb-4 uppercase tracking-wide">
+        SONOGRAPHER WORKSHEET / PRELIMINARY FINDINGS DOCUMENTATION — NOT THE FINAL DIAGNOSTIC REPORT.
       </div>
 
       {/* Patient & Exam Header Table */}
@@ -170,7 +175,7 @@ export const PrintWorksheetView: React.FC<PrintWorksheetViewProps> = ({ state, s
       </div>
 
       {/* Signoff Footer */}
-      <div className="border-t-2 border-slate-900 pt-4 flex justify-between items-end text-xs">
+      <div className="border-t-2 border-slate-900 pt-4 flex justify-between items-end text-xs mb-4">
         <div>
           <div>Sonographer Sign-off: ____________________________</div>
           <div className="text-[10px] text-slate-500 mt-1">Credentials: {header.sonographer}</div>
@@ -179,6 +184,11 @@ export const PrintWorksheetView: React.FC<PrintWorksheetViewProps> = ({ state, s
           <div>Completion Date: {new Date().toLocaleDateString()}</div>
           <div className="text-[10px] text-slate-500">Validation Verified</div>
         </div>
+      </div>
+
+      {/* Requirement 11: Bottom Disclaimer Banner */}
+      <div className="bg-slate-100 border border-slate-400 text-slate-800 p-2 rounded text-center font-bold text-[10px] uppercase tracking-wide">
+        SONOGRAPHER WORKSHEET / PRELIMINARY FINDINGS DOCUMENTATION — NOT THE FINAL DIAGNOSTIC REPORT.
       </div>
     </div>
   );
