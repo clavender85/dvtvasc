@@ -20,37 +20,53 @@ export function calculateExtentDifference(
   prior?: ExtentLandmark,
   current?: ExtentLandmark
 ): { canCalculate: boolean; message: string; diffCm?: number; direction?: 'proximal_extension' | 'retraction' | 'stable' } {
-  if (!prior?.distance || !current?.distance) {
+  if (!prior || !current) {
+    return { canCalculate: false, message: 'Incomplete extent boundary documentation.' };
+  }
+
+  // Handle 'at' relation where distance is 0 or null
+  const priorDist = prior.relation === 'at' ? 0 : prior.distance;
+  const currentDist = current.relation === 'at' ? 0 : current.distance;
+
+  if (priorDist === null || currentDist === null) {
     return { canCalculate: false, message: 'Incomplete extent boundary documentation.' };
   }
 
   if (prior.landmark !== current.landmark) {
+    const priorLmLabel = LANDMARK_LABELS[prior.landmark] || prior.landmark;
+    const currentLmLabel = LANDMARK_LABELS[current.landmark] || current.landmark;
     return {
       canCalculate: false,
-      message: `Different anatomical landmarks used (${LANDMARK_LABELS[prior.landmark] || prior.landmark} vs ${LANDMARK_LABELS[current.landmark] || current.landmark}) – manual comparison required.`
+      message: `Different anatomical landmarks used (${priorLmLabel} vs ${currentLmLabel}) – manual comparison required.`
     };
   }
 
-  // Convert distances to mm
-  const priorMm = prior.unit === 'cm' ? prior.distance * 10 : prior.distance;
-  const currentMm = current.unit === 'cm' ? current.distance * 10 : current.distance;
+  // Convert distances to mm with directional polarity:
+  // Negative = proximal to landmark ('above', 'superior_to', 'proximal_to')
+  // Positive = distal to landmark ('below', 'inferior_to', 'distal_to')
+  const getSignedMm = (ext: ExtentLandmark, val: number) => {
+    const mm = ext.unit === 'cm' ? val * 10 : val;
+    const rel = ext.relation || '';
+    if (['above', 'superior_to', 'proximal_to'].includes(rel)) return -mm;
+    if (['below', 'inferior_to', 'distal_to'].includes(rel)) return mm;
+    if (rel === 'at') return 0;
+    return mm;
+  };
 
-  // Determine relation polarity: 'above' / 'superior_to' means more proximal
-  const priorIsProximalRelation = prior.relation === 'above' || prior.relation === 'superior_to';
-  const currentIsProximalRelation = current.relation === 'above' || current.relation === 'superior_to';
+  const priorSigned = getSignedMm(prior, priorDist);
+  const currentSigned = getSignedMm(current, currentDist);
 
-  let priorSignedDist = priorIsProximalRelation ? -priorMm : priorMm;
-  let currentSignedDist = currentIsProximalRelation ? -currentMm : currentMm;
+  // Signed change: (currentSigned - priorSigned)
+  // More negative = extended more proximally
+  // More positive = retracted distally
+  const changeMm = currentSigned - priorSigned;
+  const absDiffCm = parseFloat((Math.abs(changeMm) / 10).toFixed(1));
 
-  // Signed distance difference from landmark
-  const diffMm = priorSignedDist - currentSignedDist; // Positive means current is more proximal
-  const absDiffCm = parseFloat((Math.abs(diffMm) / 10).toFixed(1));
-
-  if (Math.abs(diffMm) < 5) {
+  if (Math.abs(changeMm) < 5) {
     return { canCalculate: true, message: 'Stable thrombus boundary extent.', diffCm: 0, direction: 'stable' };
   }
 
-  if (diffMm > 0) {
+  if (changeMm < 0) {
     return {
       canCalculate: true,
       message: `Interval proximal extension by approximately ${absDiffCm} cm.`,

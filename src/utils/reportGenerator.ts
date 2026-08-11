@@ -11,30 +11,149 @@ import {
   ReportBlock,
   InteractiveSentence,
   ConcisePreviewData,
-  OtherFindingItem
+  OtherFindingItem,
+  ExtentLandmark,
+  ExtentRelation
 } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
 import { generateIntervalComparisonSummary, generateKeyComparisonFinding } from './comparisonEngine';
 import { getNormalizedScope } from './scopeUtils';
 
-function formatExtent(f: VesselFinding): string {
-  if (!f.proximalExtent?.distance && !f.distalExtent?.distance) return '';
+export function formatRelationPhrase(relation?: string): string {
+  if (!relation) return '';
+  switch (relation) {
+    case 'above':
+      return 'above';
+    case 'below':
+      return 'below';
+    case 'at':
+      return 'at';
+    case 'proximal_to':
+      return 'proximal to';
+    case 'distal_to':
+      return 'distal to';
+    case 'extending_to':
+      return 'extending to';
+    case 'extending_through':
+      return 'extending through';
+    case 'superior_to':
+      return 'superior to';
+    case 'inferior_to':
+      return 'inferior to';
+    default:
+      return relation.replace(/_/g, ' ');
+  }
+}
 
-  let str = '';
-  if (f.proximalExtent && f.proximalExtent.distance !== null) {
-    const lm = LANDMARK_LABELS[f.proximalExtent.landmark] || f.proximalExtent.landmark;
-    const rel = f.proximalExtent.relation.replace('_', ' ');
-    str += `${f.proximalExtent.distance} ${f.proximalExtent.unit} ${rel} the ${lm.toLowerCase()}`;
+export function getLandmarkText(ext: ExtentLandmark): string {
+  if (ext.landmark === 'custom' && ext.customLandmark) {
+    return ext.customLandmark;
+  }
+  const label = LANDMARK_LABELS[ext.landmark] || ext.landmark;
+  // Clean up common label suffixes for fluent sentence integration if needed
+  return label.replace(' (SFJ)', '').replace(' (SPJ)', '').replace(' / Popliteal Fossa', '');
+}
+
+export function formatSingleBoundText(ext: ExtentLandmark, options?: { omitLandmarkName?: boolean }): string {
+  const lmRaw = getLandmarkText(ext);
+  const isAcronym = ['SFJ', 'SPJ', 'IVC'].includes(ext.landmark);
+  const lm = isAcronym ? lmRaw : lmRaw.toLowerCase();
+  const rel = formatRelationPhrase(ext.relation);
+
+  if (ext.relation === 'at') {
+    return options?.omitLandmarkName ? 'at' : `at the ${lm}`;
+  }
+  if (ext.relation === 'extending_to') {
+    return options?.omitLandmarkName ? 'extending to' : `extending to the ${lm}`;
+  }
+  if (ext.relation === 'extending_through') {
+    return options?.omitLandmarkName ? 'extending through' : `extending through the ${lm}`;
   }
 
-  if (f.distalExtent && f.distalExtent.distance !== null) {
-    const lm = LANDMARK_LABELS[f.distalExtent.landmark] || f.distalExtent.landmark;
-    const rel = f.distalExtent.relation.replace('_', ' ');
-    if (str) str += ' to ';
-    str += `${f.distalExtent.distance} ${f.distalExtent.unit} ${rel} the ${lm.toLowerCase()}`;
+  if (ext.distance !== null && ext.distance !== undefined) {
+    const distStr = `${ext.distance} ${ext.unit}`;
+    if (rel) {
+      return options?.omitLandmarkName ? `${distStr} ${rel}` : `${distStr} ${rel} the ${lm}`;
+    }
+    return options?.omitLandmarkName ? distStr : `${distStr} from the ${lm}`;
   }
 
-  return str ? `extending from ${str}` : '';
+  if (rel) {
+    return options?.omitLandmarkName ? rel : `${rel} the ${lm}`;
+  }
+
+  return options?.omitLandmarkName ? '' : `at the ${lm}`;
+}
+
+export function formatExtent(f: VesselFinding): string {
+  const prox = f.proximalExtent;
+  const dist = f.distalExtent;
+
+  const hasProx = Boolean(prox && (prox.distance !== null || prox.relation));
+  const hasDist = Boolean(dist && (dist.distance !== null || dist.relation));
+
+  if (!hasProx && !hasDist) return '';
+
+  if (hasProx && hasDist && prox && dist) {
+    const isSameLandmark = prox.landmark === dist.landmark;
+    const isSameUnit = prox.unit === dist.unit;
+    const isSameRelation = prox.relation === dist.relation;
+
+    // Case A: Same landmark + Same relation + Same unit + both have distances
+    // e.g. "extending from approximately 20 to 90 mm below the knee crease"
+    if (
+      isSameLandmark &&
+      isSameRelation &&
+      isSameUnit &&
+      prox.distance !== null &&
+      dist.distance !== null &&
+      prox.relation &&
+      !['at', 'extending_to', 'extending_through'].includes(prox.relation)
+    ) {
+      const lmRaw = getLandmarkText(prox);
+      const isAcronym = ['SFJ', 'SPJ', 'IVC'].includes(prox.landmark);
+      const lm = isAcronym ? lmRaw : lmRaw.toLowerCase();
+      const rel = formatRelationPhrase(prox.relation);
+      return `extending from approximately ${prox.distance} to ${dist.distance} ${prox.unit} ${rel} the ${lm}`;
+    }
+
+    // Case B: Same landmark + Same unit + both have distances, but different relations
+    // e.g. "extending from approximately 40 mm above to 30 mm below the knee crease"
+    if (
+      isSameLandmark &&
+      isSameUnit &&
+      prox.distance !== null &&
+      dist.distance !== null &&
+      prox.relation &&
+      dist.relation &&
+      !['at', 'extending_to', 'extending_through'].includes(prox.relation) &&
+      !['at', 'extending_to', 'extending_through'].includes(dist.relation)
+    ) {
+      const lmRaw = getLandmarkText(prox);
+      const isAcronym = ['SFJ', 'SPJ', 'IVC'].includes(prox.landmark);
+      const lm = isAcronym ? lmRaw : lmRaw.toLowerCase();
+      const proxText = formatSingleBoundText(prox, { omitLandmarkName: true });
+      const distText = formatSingleBoundText(dist, { omitLandmarkName: true });
+      return `extending from approximately ${proxText} to ${distText} the ${lm}`;
+    }
+
+    // Case C: Different landmarks or distinct relations
+    const pStr = formatSingleBoundText(prox);
+    const dStr = formatSingleBoundText(dist);
+    return `extending from approximately ${pStr} to ${dStr}`;
+  }
+
+  if (hasProx && prox) {
+    const pStr = formatSingleBoundText(prox);
+    return `extending from approximately ${pStr}`;
+  }
+
+  if (hasDist && dist) {
+    const dStr = formatSingleBoundText(dist);
+    return `extending to approximately ${dStr}`;
+  }
+
+  return '';
 }
 
 export function formatOtherFindingDimensions(item: OtherFindingItem): string {

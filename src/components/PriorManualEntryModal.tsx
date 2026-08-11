@@ -1,7 +1,7 @@
 // Modal for Manually Entering Prior Report Findings when Structured Data is Unavailable
 
 import React, { useState } from 'react';
-import { PriorVesselFinding, Side, VesselCategory, VesselStatus, ThrombusPresence, Compressibility, Patency, SonographicChronicity, Landmark } from '../types/dvt';
+import { PriorVesselFinding, Side, VesselCategory, VesselStatus, ThrombusPresence, Compressibility, Patency, SonographicChronicity, Landmark, ExtentRelation, EXTENT_RELATION_LABELS } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
 import { X, Plus, Trash2, Save, FileText } from 'lucide-react';
 
@@ -215,39 +215,78 @@ export const PriorManualEntryModal: React.FC<PriorManualEntryModalProps> = ({
                     </div>
 
                     {/* Extent & Comments */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-3 pt-1">
                       <div>
-                        <label className="block text-slate-400 text-[11px] font-semibold mb-1">Proximal Extent Landmark</label>
-                        <div className="flex gap-2">
+                        <label className="block text-slate-400 text-[11px] font-semibold mb-1">
+                          Proximal Extent [ Distance | Unit | Relationship | Landmark ]
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-1.5">
                           <input
                             type="number"
-                            placeholder="Distance"
-                            value={item.proximalExtent?.distance || ''}
+                            placeholder="Dist"
+                            value={item.proximalExtent?.distance ?? ''}
                             onChange={(e) =>
                               handleUpdateFinding(vKey, {
                                 proximalExtent: {
-                                  distance: parseFloat(e.target.value) || null,
-                                  unit: 'mm',
-                                  relation: 'below',
+                                  distance: e.target.value !== '' ? Number(e.target.value) : null,
+                                  unit: item.proximalExtent?.unit || 'mm',
+                                  relation: item.proximalExtent?.relation || 'above',
                                   landmark: item.proximalExtent?.landmark || 'knee_crease'
                                 }
                               })
                             }
-                            className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100"
+                            className="sm:col-span-3 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs"
                           />
+                          <select
+                            value={item.proximalExtent?.unit || 'mm'}
+                            onChange={(e) =>
+                              handleUpdateFinding(vKey, {
+                                proximalExtent: {
+                                  distance: item.proximalExtent?.distance ?? null,
+                                  unit: e.target.value as 'mm' | 'cm',
+                                  relation: item.proximalExtent?.relation || 'above',
+                                  landmark: item.proximalExtent?.landmark || 'knee_crease'
+                                }
+                              })
+                            }
+                            className="sm:col-span-2 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs"
+                          >
+                            <option value="mm">mm</option>
+                            <option value="cm">cm</option>
+                          </select>
+                          <select
+                            value={item.proximalExtent?.relation || 'above'}
+                            onChange={(e) =>
+                              handleUpdateFinding(vKey, {
+                                proximalExtent: {
+                                  distance: item.proximalExtent?.distance ?? null,
+                                  unit: item.proximalExtent?.unit || 'mm',
+                                  relation: e.target.value as ExtentRelation,
+                                  landmark: item.proximalExtent?.landmark || 'knee_crease'
+                                }
+                              })
+                            }
+                            className="sm:col-span-3 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100 text-xs"
+                          >
+                            {Object.entries(EXTENT_RELATION_LABELS).map(([relKey, label]) => (
+                              <option key={relKey} value={relKey}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
                           <select
                             value={item.proximalExtent?.landmark || 'knee_crease'}
                             onChange={(e) =>
                               handleUpdateFinding(vKey, {
                                 proximalExtent: {
-                                  distance: item.proximalExtent?.distance || null,
-                                  unit: 'mm',
-                                  relation: 'below',
+                                  distance: item.proximalExtent?.distance ?? null,
+                                  unit: item.proximalExtent?.unit || 'mm',
+                                  relation: item.proximalExtent?.relation || 'above',
                                   landmark: e.target.value as Landmark
                                 }
                               })
                             }
-                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100"
+                            className="sm:col-span-4 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 text-xs truncate"
                           >
                             {Object.entries(LANDMARK_LABELS).map(([k, label]) => (
                               <option key={k} value={k}>
@@ -262,10 +301,10 @@ export const PriorManualEntryModal: React.FC<PriorManualEntryModalProps> = ({
                         <label className="block text-slate-400 text-[11px] font-semibold mb-1">Prior Report Excerpt / Comments</label>
                         <input
                           type="text"
-                          placeholder="e.g. Occlusive thrombus reported 5cm below knee crease..."
+                          placeholder="e.g. Occlusive thrombus reported 50 mm below knee crease..."
                           value={item.comments || ''}
                           onChange={(e) => handleUpdateFinding(vKey, { comments: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 text-xs"
                         />
                       </div>
                     </div>

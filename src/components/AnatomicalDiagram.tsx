@@ -197,7 +197,83 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showLandmarks, setShowLandmarks] = useState<boolean>(true);
   const [showTextLabels, setShowTextLabels] = useState<boolean>(false);
+  const [showAnatomicalContext, setShowAnatomicalContext] = useState<boolean>(false);
   const [mapViewMode, setMapViewMode] = useState<MapViewMode>('all');
+  const [limbFocus, setLimbFocus] = useState<'bilateral' | 'right' | 'left'>('bilateral');
+  const [regionFocus, setRegionFocus] = useState<'full' | 'thigh' | 'popliteal' | 'calf'>('full');
+
+  const abnormalVesselCount = Object.values(vesselFindings).filter(
+    (f) => (f as VesselFinding)?.status === 'abnormal'
+  ).length;
+
+  const getDiagramViewBox = (): string => {
+    let x = 0;
+    let width = 900;
+    let y = 0;
+    let height = 1000;
+
+    if (limbFocus === 'right') {
+      x = 80;
+      width = 380;
+    } else if (limbFocus === 'left') {
+      x = 440;
+      width = 380;
+    }
+
+    if (regionFocus === 'thigh') {
+      y = 150;
+      height = 420;
+    } else if (regionFocus === 'popliteal') {
+      y = 490;
+      height = 200;
+    } else if (regionFocus === 'calf') {
+      y = 550;
+      height = 420;
+    }
+
+    if (mapViewMode === 'abnormal_only' && abnormalVesselCount > 0) {
+      const abnormalKeys = Object.keys(vesselFindings).filter(
+        (id) => vesselFindings[id]?.status === 'abnormal'
+      );
+
+      let minY = 1000;
+      let maxY = 0;
+      let hasRight = false;
+      let hasLeft = false;
+
+      abnormalKeys.forEach((key) => {
+        if (key.startsWith('right_')) hasRight = true;
+        if (key.startsWith('left_')) hasLeft = true;
+
+        if (key.includes('CIV') || key.includes('IVC') || key.includes('EIV')) {
+          minY = Math.min(minY, 60); maxY = Math.max(maxY, 250);
+        } else if (key.includes('CFV') || key.includes('PFV') || key.includes('GSV_PROX')) {
+          minY = Math.min(minY, 240); maxY = Math.max(maxY, 400);
+        } else if (key.includes('FV_')) {
+          minY = Math.min(minY, 300); maxY = Math.max(maxY, 540);
+        } else if (key.includes('POPV') || key.includes('SPJ') || key.includes('TPTV')) {
+          minY = Math.min(minY, 520); maxY = Math.max(maxY, 660);
+        } else {
+          minY = Math.min(minY, 600); maxY = Math.max(maxY, 950);
+        }
+      });
+
+      if (minY < maxY && regionFocus === 'full') {
+        y = Math.max(0, minY - 40);
+        height = Math.min(1000 - y, maxY - minY + 80);
+      }
+
+      if (hasRight && !hasLeft && limbFocus === 'bilateral') {
+        x = 80;
+        width = 380;
+      } else if (hasLeft && !hasRight && limbFocus === 'bilateral') {
+        x = 440;
+        width = 380;
+      }
+    }
+
+    return `${x} ${y} ${width} ${height}`;
+  };
 
   // Double Click / Double Tap Tracker
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
@@ -491,7 +567,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         lumenColor: 'transparent',
         lumenWidth: 0,
         statusText: 'Not Examined (NA)',
-        opacity: 0.45
+        opacity: 0.35
       };
     }
 
@@ -501,7 +577,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       const customNote = finding.customNonVisualizationReason ? `: ${finding.customNonVisualizationReason}` : '';
       return {
         wallColor: '#94a3b8',
-        wallDashArray: '2 3',
+        wallDashArray: '3 3',
         wallWidth: calculatedWidth * 0.85,
         fillColor: 'transparent',
         fillWidth: 0,
@@ -514,17 +590,16 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     }
 
     if (finding.status === 'normal') {
-      const isSuperficial = category === 'superficial';
       return {
-        wallColor: isSuperficial ? '#0284c7' : '#059669',
+        wallColor: '#64748b',
         wallWidth: calculatedWidth,
-        fillColor: isSuperficial ? '#0284c7' : '#059669',
+        fillColor: '#64748b',
         fillWidth: Math.max(2, calculatedWidth - 2),
         lumenType: 'full_flow',
-        lumenColor: isSuperficial ? '#38bdf8' : '#34d399',
+        lumenColor: '#94a3b8',
         lumenWidth: Math.max(3, calculatedWidth - 4),
         statusText: 'Normal Patent',
-        opacity: mapViewMode === 'abnormal_only' ? 0.3 : 0.95
+        opacity: 0.95
       };
     }
 
@@ -946,11 +1021,122 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             </button>
           )}
 
+          {/* Map Filter Mode Segmented Control */}
+          <div className="flex items-center bg-slate-900 rounded p-0.5 border border-slate-700">
+            <button
+              type="button"
+              onClick={() => setMapViewMode('all')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                mapViewMode === 'all'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapViewMode('abnormal_only')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                mapViewMode === 'abnormal_only'
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Abnormal Only
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapViewMode('selected')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                mapViewMode === 'selected'
+                  ? 'bg-teal-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Selected
+            </button>
+          </div>
+
+          {/* Limb Focus Segmented Control */}
+          <div className="flex items-center bg-slate-900 rounded p-0.5 border border-slate-700">
+            <button
+              type="button"
+              onClick={() => setLimbFocus('bilateral')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                limbFocus === 'bilateral' ? 'bg-slate-700 text-slate-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Bilateral lower limb view"
+            >
+              Both Legs
+            </button>
+            <button
+              type="button"
+              onClick={() => setLimbFocus('right')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                limbFocus === 'right' ? 'bg-teal-800 text-teal-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Right leg focus"
+            >
+              Right
+            </button>
+            <button
+              type="button"
+              onClick={() => setLimbFocus('left')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                limbFocus === 'left' ? 'bg-sky-800 text-sky-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Left leg focus"
+            >
+              Left
+            </button>
+          </div>
+
+          {/* Region Zoom Segmented Control */}
+          <div className="flex items-center bg-slate-900 rounded p-0.5 border border-slate-700">
+            <button
+              type="button"
+              onClick={() => setRegionFocus('full')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                regionFocus === 'full' ? 'bg-slate-700 text-slate-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Full
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegionFocus('thigh')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                regionFocus === 'thigh' ? 'bg-slate-700 text-slate-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Thigh
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegionFocus('popliteal')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                regionFocus === 'popliteal' ? 'bg-slate-700 text-slate-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Popliteal
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegionFocus('calf')}
+              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                regionFocus === 'calf' ? 'bg-slate-700 text-slate-100 shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Calf
+            </button>
+          </div>
+
           {/* Text Descriptors Toggle Button */}
           <button
             type="button"
             onClick={() => setShowTextLabels(!showTextLabels)}
-            className={`px-2 py-1 rounded text-[11px] font-bold transition-all border flex items-center gap-1.5 ${
+            className={`px-2 py-1 rounded text-[11px] font-bold transition-all border flex items-center gap-1 ${
               showTextLabels
                 ? 'bg-amber-950 text-amber-300 border-amber-700'
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
@@ -975,14 +1161,15 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
           <button
             type="button"
-            onClick={() =>
-              setMapViewMode((prev) =>
-                prev === 'all' ? 'abnormal_only' : prev === 'abnormal_only' ? 'selected' : 'all'
-              )
-            }
-            className="px-2.5 py-1 rounded text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+            onClick={() => setShowAnatomicalContext(!showAnatomicalContext)}
+            className={`px-2 py-1 rounded text-[11px] font-bold transition-all border ${
+              showAnatomicalContext
+                ? 'bg-slate-800 text-slate-200 border-slate-600'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+            }`}
+            title="Toggle faint background muscle context boundaries"
           >
-            Filter: {mapViewMode === 'all' ? 'All' : mapViewMode === 'abnormal_only' ? 'Abnormal Only' : 'Selected Only'}
+            Anatomical Context: {showAnatomicalContext ? 'ON' : 'OFF'}
           </button>
 
           <div className="flex items-center bg-slate-950 rounded border border-slate-800 p-0.5">
@@ -1025,7 +1212,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             <span className="font-semibold text-rose-300">Abnormal (DVT Highlighted)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-300 inline-block"></span>
+            <span className="w-3 h-3 rounded-full bg-slate-500 border border-slate-400 inline-block"></span>
             <span className="text-slate-300">Normal Patent</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -1352,7 +1539,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                     hoveredFinding.status === 'abnormal'
                       ? 'bg-amber-950 text-amber-300 border border-amber-800'
                       : hoveredFinding.status === 'normal'
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      ? 'bg-slate-800 text-slate-300 border border-slate-700'
                       : hoveredFinding.status === 'not_visualised'
                       ? 'bg-slate-900 text-slate-300 border border-slate-700'
                       : 'bg-slate-800 text-slate-400'
@@ -1371,7 +1558,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   {hoveredFinding.chronicity ? ` (${hoveredFinding.chronicity.replace(/_/g, ' ')})` : ''}
                 </p>
               ) : hoveredFinding.status === 'normal' ? (
-                <p className="text-[10px] text-emerald-400 mt-0.5">Normal / Patent</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Normal / Patent</p>
               ) : null}
               <p className="text-[9px] text-slate-400 mt-0.5 italic">Click: Select • Double-Click: Edit</p>
             </div>
@@ -1383,8 +1570,8 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
           >
             <svg
-              viewBox="0 0 900 1020"
-              className="w-full h-auto"
+              viewBox={getDiagramViewBox()}
+              className="w-full h-auto transition-all duration-300 ease-in-out"
               preserveAspectRatio="xMidYMid meet"
             >
               <defs>
@@ -1416,21 +1603,47 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                 </pattern>
               </defs>
 
+            {/* Blank Pathology State Overlay when Abnormal Only filter produces zero matches */}
+            {mapViewMode === 'abnormal_only' && abnormalVesselCount === 0 && (
+              <foreignObject x="150" y="300" width="600" height="350">
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
+                  <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl max-w-md space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-emerald-950 border border-emerald-700/60 flex items-center justify-center mx-auto text-emerald-400">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                      No Abnormal Venous Segments
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      No abnormal thrombus findings or chronic post-thrombotic changes are documented in this study.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setMapViewMode('all')}
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95"
+                    >
+                      Show All Anatomical Segments
+                    </button>
+                  </div>
+                </div>
+              </foreignObject>
+            )}
+
             {/* ANATOMICAL LANDMARK GUIDELINE ANNOTATIONS */}
             {showLandmarks && (
               <g className="landmarks-layer" opacity="0.85">
                 {/* Groin Crease */}
                 <line
-                  x1="60"
+                  x1="40"
                   y1={LANDMARK_Y.GROIN_CREASE}
-                  x2="840"
+                  x2="860"
                   y2={LANDMARK_Y.GROIN_CREASE}
                   stroke="#475569"
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                 />
                 <rect
-                  x="70"
+                  x="50"
                   y={LANDMARK_Y.GROIN_CREASE - 10}
                   width="110"
                   height="18"
@@ -1439,7 +1652,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   stroke="#334155"
                 />
                 <text
-                  x="125"
+                  x="105"
                   y={LANDMARK_Y.GROIN_CREASE + 3}
                   textAnchor="middle"
                   fill="#94a3b8"
@@ -1451,19 +1664,19 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
                 {/* SFJ Junction Line */}
                 <line
-                  x1="60"
+                  x1="40"
                   y1={LANDMARK_Y.SFJ}
-                  x2="840"
+                  x2="860"
                   y2={LANDMARK_Y.SFJ}
-                  stroke="#0284c7"
+                  stroke="#475569"
                   strokeWidth="1.2"
                   strokeDasharray="2 3"
                 />
                 <text
-                  x="830"
+                  x="850"
                   y={LANDMARK_Y.SFJ + 3}
                   textAnchor="end"
-                  fill="#38bdf8"
+                  fill="#94a3b8"
                   fontSize="10"
                   fontWeight="bold"
                 >
@@ -1472,16 +1685,16 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
                 {/* Knee Crease */}
                 <line
-                  x1="60"
+                  x1="40"
                   y1={LANDMARK_Y.KNEE_CREASE}
-                  x2="840"
+                  x2="860"
                   y2={LANDMARK_Y.KNEE_CREASE}
                   stroke="#475569"
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                 />
                 <rect
-                  x="70"
+                  x="50"
                   y={LANDMARK_Y.KNEE_CREASE - 10}
                   width="130"
                   height="18"
@@ -1490,7 +1703,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   stroke="#334155"
                 />
                 <text
-                  x="135"
+                  x="115"
                   y={LANDMARK_Y.KNEE_CREASE + 3}
                   textAnchor="middle"
                   fill="#94a3b8"
@@ -1502,19 +1715,19 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
                 {/* SPJ Junction Line */}
                 <line
-                  x1="60"
+                  x1="40"
                   y1={LANDMARK_Y.SPJ}
-                  x2="840"
+                  x2="860"
                   y2={LANDMARK_Y.SPJ}
-                  stroke="#0284c7"
+                  stroke="#475569"
                   strokeWidth="1.2"
                   strokeDasharray="2 3"
                 />
                 <text
-                  x="830"
+                  x="850"
                   y={LANDMARK_Y.SPJ + 3}
                   textAnchor="end"
-                  fill="#38bdf8"
+                  fill="#94a3b8"
                   fontSize="10"
                   fontWeight="bold"
                 >
@@ -1523,16 +1736,16 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
                 {/* Ankle Crease */}
                 <line
-                  x1="60"
+                  x1="40"
                   y1={LANDMARK_Y.ANKLE}
-                  x2="840"
+                  x2="860"
                   y2={LANDMARK_Y.ANKLE}
                   stroke="#475569"
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                 />
                 <rect
-                  x="70"
+                  x="50"
                   y={LANDMARK_Y.ANKLE - 10}
                   width="110"
                   height="18"
@@ -1541,7 +1754,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   stroke="#334155"
                 />
                 <text
-                  x="125"
+                  x="105"
                   y={LANDMARK_Y.ANKLE + 3}
                   textAnchor="middle"
                   fill="#94a3b8"
@@ -1553,100 +1766,104 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               </g>
             )}
 
-            {/* MUSCLE BELLY SHADED OUTLINES */}
-            <path
-              d="M210,580 C180,620 180,720 220,770 C280,780 340,750 350,680 C360,610 320,570 210,580 Z"
-              fill="#064e3b"
-              fillOpacity="0.15"
-              stroke="#047857"
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
-            <text x="185" y="660" fill="#059669" fontSize="9" fontWeight="bold" opacity="0.8">
-              R Gastroc Muscle
-            </text>
+            {/* MUSCLE BELLY SHADED OUTLINES (OPTIONAL ANATOMICAL CONTEXT) */}
+            {showAnatomicalContext && mapViewMode !== 'abnormal_only' && (
+              <g key="muscle_belly_outlines">
+                <path
+                  d="M210,580 C180,620 180,720 220,770 C280,780 340,750 350,680 C360,610 320,570 210,580 Z"
+                  fill="#334155"
+                  fillOpacity="0.06"
+                  stroke="#64748b"
+                  strokeWidth="1"
+                  strokeDasharray="2 3"
+                />
+                <text x="185" y="660" fill="#64748b" fontSize="9" fontWeight="bold" opacity="0.5">
+                  R Gastroc Muscle
+                </text>
 
-            <path
-              d="M690,580 C720,620 720,720 680,770 C620,780 560,750 550,680 C540,610 580,570 690,580 Z"
-              fill="#064e3b"
-              fillOpacity="0.15"
-              stroke="#047857"
-              strokeWidth="1"
-              strokeDasharray="3 3"
-            />
-            <text x="715" y="660" fill="#059669" fontSize="9" fontWeight="bold" opacity="0.8">
-              L Gastroc Muscle
-            </text>
+                <path
+                  d="M690,580 C720,620 720,720 680,770 C620,780 560,750 550,680 C540,610 580,570 690,580 Z"
+                  fill="#334155"
+                  fillOpacity="0.06"
+                  stroke="#64748b"
+                  strokeWidth="1"
+                  strokeDasharray="2 3"
+                />
+                <text x="715" y="660" fill="#64748b" fontSize="9" fontWeight="bold" opacity="0.5">
+                  L Gastroc Muscle
+                </text>
+              </g>
+            )}
 
             {/* CENTRAL & PELVIC VEINS */}
             {renderVesselSegment(
               'pelvis_IVC',
-              'Inferior Vena Cava (IVC)',
+              'IVC',
               'pelvis',
-              'M450,60 L450,150',
+              'M450,50 L450,140',
               false,
               undefined,
-              { x: 450, y: 105, textAnchor: 'middle' }
+              { x: 450, y: 95, textAnchor: 'middle' }
             )}
 
             {renderVesselSegment(
               'right_CIV',
               'Right Common Iliac',
               'pelvis',
-              'M450,150 L340,210',
+              'M450,140 L300,200',
               false,
               undefined,
-              { x: 380, y: 170, textAnchor: 'end' }
+              { x: 360, y: 165, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_CIV',
               'Left Common Iliac',
               'pelvis',
-              'M450,150 L560,210',
+              'M450,140 L600,200',
               false,
               undefined,
-              { x: 520, y: 170, textAnchor: 'start' }
+              { x: 540, y: 165, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_IIV',
               'Right Internal Iliac',
               'pelvis',
-              'M380,180 L410,230',
+              'M340,175 L380,225',
               false,
               undefined,
-              { x: 415, y: 225, textAnchor: 'start' }
+              { x: 395, y: 220, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_IIV',
               'Left Internal Iliac',
               'pelvis',
-              'M520,180 L490,230',
+              'M560,175 L520,225',
               false,
               undefined,
-              { x: 485, y: 225, textAnchor: 'end' }
+              { x: 505, y: 220, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_EIV',
               'Right External Iliac',
               'pelvis',
-              `M340,210 L290,${LANDMARK_Y.GROIN_CREASE}`,
+              `M300,200 L270,${LANDMARK_Y.GROIN_CREASE}`,
               false,
               undefined,
-              { x: 300, y: 225, textAnchor: 'end' }
+              { x: 280, y: 225, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_EIV',
               'Left External Iliac',
               'pelvis',
-              `M560,210 L610,${LANDMARK_Y.GROIN_CREASE}`,
+              `M600,200 L630,${LANDMARK_Y.GROIN_CREASE}`,
               false,
               undefined,
-              { x: 600, y: 225, textAnchor: 'start' }
+              { x: 620, y: 225, textAnchor: 'start' }
             )}
 
             {/* RIGHT LOWER LIMB VEINS */}
@@ -1654,70 +1871,70 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               'right_CFV',
               'Right CFV',
               'thigh',
-              `M290,${LANDMARK_Y.GROIN_CREASE} L290,300`,
+              `M270,${LANDMARK_Y.GROIN_CREASE} L270,300`,
               false,
               undefined,
-              { x: 275, y: 270, textAnchor: 'end' }
+              { x: 250, y: 270, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_GSV_PROX',
               'Right Prox GSV',
               'superficial',
-              `M290,${LANDMARK_Y.SFJ} C360,330 370,450 370,${LANDMARK_Y.KNEE_CREASE}`,
+              `M270,${LANDMARK_Y.SFJ} C370,310 390,430 390,${LANDMARK_Y.KNEE_CREASE}`,
               false,
               undefined,
-              { x: 360, y: 380, textAnchor: 'start' }
+              { x: 405, y: 390, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_PFV',
               'Right PFV',
               'thigh',
-              'M290,295 C230,320 220,410 230,480',
+              'M270,295 C200,320 180,410 180,490',
               false,
               undefined,
-              { x: 220, y: 390, textAnchor: 'end' }
+              { x: 165, y: 390, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_FV_PROX',
               'Right Prox FV',
               'thigh',
-              'M290,300 L290,370',
+              'M270,300 L270,370',
               false,
               undefined,
-              { x: 300, y: 335, textAnchor: 'start' }
+              { x: 285, y: 335, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_FV_MID',
               'Right Mid FV',
               'thigh',
-              'M290,370 L290,460',
+              'M270,370 L270,450',
               false,
               undefined,
-              { x: 300, y: 415, textAnchor: 'start' }
+              { x: 285, y: 410, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_FV_DIST',
-              'Right Distal FV',
+              'Right Dist FV',
               'thigh',
-              `M290,460 L290,530`,
+              `M270,450 L270,530`,
               false,
               undefined,
-              { x: 300, y: 495, textAnchor: 'start' }
+              { x: 285, y: 490, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_POPV',
-              'Right Popliteal',
+              'Right Pop V',
               'popliteal',
-              `M290,530 L290,${LANDMARK_Y.SPJ + 30}`,
+              `M270,530 L270,610`,
               false,
               undefined,
-              { x: 275, y: 575, textAnchor: 'end' }
+              { x: 250, y: 570, textAnchor: 'end' }
             )}
 
             {/* Right SSV Anatomical Rendering based on SSV Variant */}
@@ -1731,34 +1948,34 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   {/* Right SSV Main Calf */}
                   {renderVesselSegment(
                     'right_SSV',
-                    'Right SSV (Calf)',
+                    'Right SSV',
                     'superficial',
-                    `M270,620 C260,680 260,760 270,860`,
+                    `M140,610 C130,720 130,830 140,${LANDMARK_Y.ANKLE}`,
                     false,
                     undefined,
-                    { x: 250, y: 720, textAnchor: 'end' }
+                    { x: 120, y: 760, textAnchor: 'end' }
                   )}
 
                   {/* Right SSV SPJ Junction Branch */}
                   {showSpj && renderVesselSegment(
                     'right_SSV_SPJ',
-                    'Right SSV (SPJ Junction)',
+                    'Right SPJ',
                     'superficial',
-                    `M270,620 L290,${LANDMARK_Y.SPJ}`,
+                    `M140,610 L270,590`,
                     false,
                     undefined,
-                    { x: 275, y: 610, textAnchor: 'end' }
+                    { x: 200, y: 595, textAnchor: 'end' }
                   )}
 
                   {/* Right SSV Cranial Thigh Extension */}
                   {showCranial && renderVesselSegment(
                     'right_SSV_CRANIAL',
-                    'Right Cranial SSV Extension',
+                    'Right Cranial SSV',
                     'superficial',
-                    `M270,620 C265,560 265,500 270,450`,
+                    `M140,610 C140,540 150,470 160,420`,
                     false,
                     undefined,
-                    { x: 255, y: 510, textAnchor: 'end' }
+                    { x: 145, y: 480, textAnchor: 'end' }
                   )}
                 </g>
               );
@@ -1766,82 +1983,82 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
             {renderVesselSegment(
               'right_TPTV',
-              'Right TPTV',
+              'Right TPT',
               'calf_deep',
-              `M290,${LANDMARK_Y.SPJ + 30} L290,660`,
+              `M270,610 L270,650`,
               false,
               undefined,
-              { x: 300, y: 640, textAnchor: 'start' }
+              { x: 285, y: 630, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_PTV',
-              'Right PTV (Paired)',
+              'Right PTV',
               'calf_deep',
-              `M315,660 L335,${LANDMARK_Y.ANKLE}`,
+              `M335,650 L350,${LANDMARK_Y.ANKLE}`,
               true,
-              `M323,660 L343,${LANDMARK_Y.ANKLE}`,
-              { x: 345, y: 800, textAnchor: 'start' }
+              `M347,650 L362,${LANDMARK_Y.ANKLE}`,
+              { x: 375, y: 780, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_PERV',
-              'Right PerV (Paired)',
+              'Right Per V',
               'calf_deep',
-              `M285,660 L285,${LANDMARK_Y.ANKLE}`,
+              `M265,650 L265,${LANDMARK_Y.ANKLE}`,
               true,
-              `M293,660 L293,${LANDMARK_Y.ANKLE}`,
-              { x: 275, y: 800, textAnchor: 'end' }
+              `M277,650 L277,${LANDMARK_Y.ANKLE}`,
+              { x: 250, y: 780, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_ATV',
-              'Right ATV (Paired)',
+              'Right ATV',
               'calf_deep',
-              `M255,660 L235,${LANDMARK_Y.ANKLE}`,
+              `M205,650 L190,${LANDMARK_Y.ANKLE}`,
               true,
-              `M263,660 L243,${LANDMARK_Y.ANKLE}`,
-              { x: 225, y: 800, textAnchor: 'end' }
+              `M217,650 L202,${LANDMARK_Y.ANKLE}`,
+              { x: 175, y: 780, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_MGV',
-              'Right MGV',
+              'Right Med Gastroc',
               'muscular_calf',
-              'M300,600 C340,630 350,710 325,750',
+              'M280,600 C370,630 395,700 375,760',
               true,
-              'M306,600 C346,630 356,710 331,750',
-              { x: 360, y: 680, textAnchor: 'start' }
+              'M286,600 C376,630 401,700 381,760',
+              { x: 410, y: 680, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_LGV',
-              'Right LGV',
+              'Right Lat Gastroc',
               'muscular_calf',
-              'M280,600 C240,630 230,710 255,750',
+              'M260,600 C180,630 155,700 175,760',
               true,
-              'M274,600 C234,630 224,710 249,750',
-              { x: 215, y: 680, textAnchor: 'end' }
+              'M266,600 C186,630 161,700 181,760',
+              { x: 140, y: 680, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'right_SV',
               'Right Soleal V',
               'muscular_calf',
-              'M290,680 C320,710 320,780 295,830',
+              'M270,660 C310,700 320,780 305,840',
               true,
-              'M298,680 C328,710 328,780 303,830',
-              { x: 330, y: 760, textAnchor: 'start' }
+              'M278,660 C318,700 328,780 313,840',
+              { x: 330, y: 740, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'right_GSV_CALF',
               'Right Calf GSV',
               'superficial',
-              `M370,${LANDMARK_Y.KNEE_CREASE} C385,680 380,820 370,${LANDMARK_Y.ANKLE}`,
+              `M390,${LANDMARK_Y.KNEE_CREASE} C420,680 420,820 410,${LANDMARK_Y.ANKLE}`,
               false,
               undefined,
-              { x: 385, y: 760, textAnchor: 'start' }
+              { x: 425, y: 760, textAnchor: 'start' }
             )}
 
             {/* LEFT LOWER LIMB VEINS */}
@@ -1849,70 +2066,70 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               'left_CFV',
               'Left CFV',
               'thigh',
-              `M610,${LANDMARK_Y.GROIN_CREASE} L610,300`,
+              `M630,${LANDMARK_Y.GROIN_CREASE} L630,300`,
               false,
               undefined,
-              { x: 625, y: 270, textAnchor: 'start' }
+              { x: 650, y: 270, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_GSV_PROX',
               'Left Prox GSV',
               'superficial',
-              `M610,${LANDMARK_Y.SFJ} C540,330 530,450 530,${LANDMARK_Y.KNEE_CREASE}`,
+              `M630,${LANDMARK_Y.SFJ} C530,310 510,430 510,${LANDMARK_Y.KNEE_CREASE}`,
               false,
               undefined,
-              { x: 520, y: 380, textAnchor: 'end' }
+              { x: 495, y: 390, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_PFV',
               'Left PFV',
               'thigh',
-              'M610,295 C670,320 680,410 670,480',
+              'M630,295 C700,320 720,410 720,490',
               false,
               undefined,
-              { x: 680, y: 390, textAnchor: 'start' }
+              { x: 735, y: 390, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_FV_PROX',
               'Left Prox FV',
               'thigh',
-              'M610,300 L610,370',
+              'M630,300 L630,370',
               false,
               undefined,
-              { x: 600, y: 335, textAnchor: 'end' }
+              { x: 615, y: 335, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_FV_MID',
               'Left Mid FV',
               'thigh',
-              'M610,370 L610,460',
+              'M630,370 L630,450',
               false,
               undefined,
-              { x: 600, y: 415, textAnchor: 'end' }
+              { x: 615, y: 410, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_FV_DIST',
-              'Left Distal FV',
+              'Left Dist FV',
               'thigh',
-              `M610,460 L610,530`,
+              `M630,450 L630,530`,
               false,
               undefined,
-              { x: 600, y: 495, textAnchor: 'end' }
+              { x: 615, y: 490, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_POPV',
-              'Left Popliteal',
+              'Left Pop V',
               'popliteal',
-              `M610,530 L610,${LANDMARK_Y.SPJ + 30}`,
+              `M630,530 L630,610`,
               false,
               undefined,
-              { x: 625, y: 575, textAnchor: 'start' }
+              { x: 650, y: 570, textAnchor: 'start' }
             )}
 
             {/* Left SSV Anatomical Rendering based on SSV Variant */}
@@ -1926,34 +2143,34 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
                   {/* Left SSV Main Calf */}
                   {renderVesselSegment(
                     'left_SSV',
-                    'Left SSV (Calf)',
+                    'Left SSV',
                     'superficial',
-                    `M630,620 C640,680 640,760 630,860`,
+                    `M760,610 C770,720 770,830 760,${LANDMARK_Y.ANKLE}`,
                     false,
                     undefined,
-                    { x: 650, y: 720, textAnchor: 'start' }
+                    { x: 780, y: 760, textAnchor: 'start' }
                   )}
 
                   {/* Left SSV SPJ Junction Branch */}
                   {showSpj && renderVesselSegment(
                     'left_SSV_SPJ',
-                    'Left SSV (SPJ Junction)',
+                    'Left SPJ',
                     'superficial',
-                    `M630,620 L610,${LANDMARK_Y.SPJ}`,
+                    `M760,610 L630,590`,
                     false,
                     undefined,
-                    { x: 625, y: 610, textAnchor: 'start' }
+                    { x: 700, y: 595, textAnchor: 'start' }
                   )}
 
                   {/* Left SSV Cranial Thigh Extension */}
                   {showCranial && renderVesselSegment(
                     'left_SSV_CRANIAL',
-                    'Left Cranial SSV Extension',
+                    'Left Cranial SSV',
                     'superficial',
-                    `M630,620 C635,560 635,500 630,450`,
+                    `M760,610 C760,540 750,470 740,420`,
                     false,
                     undefined,
-                    { x: 645, y: 510, textAnchor: 'start' }
+                    { x: 755, y: 480, textAnchor: 'start' }
                   )}
                 </g>
               );
@@ -1961,82 +2178,82 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
             {renderVesselSegment(
               'left_TPTV',
-              'Left TPTV',
+              'Left TPT',
               'calf_deep',
-              `M610,${LANDMARK_Y.SPJ + 30} L610,660`,
+              `M630,610 L630,650`,
               false,
               undefined,
-              { x: 600, y: 640, textAnchor: 'end' }
+              { x: 615, y: 630, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_PTV',
-              'Left PTV (Paired)',
+              'Left PTV',
               'calf_deep',
-              `M585,660 L565,${LANDMARK_Y.ANKLE}`,
+              `M565,650 L550,${LANDMARK_Y.ANKLE}`,
               true,
-              `M577,660 L557,${LANDMARK_Y.ANKLE}`,
-              { x: 555, y: 800, textAnchor: 'end' }
+              `M553,650 L538,${LANDMARK_Y.ANKLE}`,
+              { x: 525, y: 780, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_PERV',
-              'Left PerV (Paired)',
+              'Left Per V',
               'calf_deep',
-              `M615,660 L615,${LANDMARK_Y.ANKLE}`,
+              `M635,650 L635,${LANDMARK_Y.ANKLE}`,
               true,
-              `M607,660 L607,${LANDMARK_Y.ANKLE}`,
-              { x: 625, y: 800, textAnchor: 'start' }
+              `M623,650 L623,${LANDMARK_Y.ANKLE}`,
+              { x: 650, y: 780, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_ATV',
-              'Left ATV (Paired)',
+              'Left ATV',
               'calf_deep',
-              `M645,660 L665,${LANDMARK_Y.ANKLE}`,
+              `M695,650 L710,${LANDMARK_Y.ANKLE}`,
               true,
-              `M637,660 L657,${LANDMARK_Y.ANKLE}`,
-              { x: 675, y: 800, textAnchor: 'start' }
+              `M683,650 L698,${LANDMARK_Y.ANKLE}`,
+              { x: 725, y: 780, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_MGV',
-              'Left MGV',
+              'Left Med Gastroc',
               'muscular_calf',
-              'M600,600 C560,630 550,710 575,750',
+              'M620,600 C530,630 505,700 525,760',
               true,
-              'M594,600 C554,630 544,710 569,750',
-              { x: 540, y: 680, textAnchor: 'end' }
+              'M614,600 C524,630 499,700 519,760',
+              { x: 490, y: 680, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_LGV',
-              'Left LGV',
+              'Left Lat Gastroc',
               'muscular_calf',
-              'M620,600 C660,630 670,710 645,750',
+              'M640,600 C720,630 745,700 725,760',
               true,
-              'M626,600 C666,630 676,710 651,750',
-              { x: 685, y: 680, textAnchor: 'start' }
+              'M634,600 C714,630 739,700 719,760',
+              { x: 760, y: 680, textAnchor: 'start' }
             )}
 
             {renderVesselSegment(
               'left_SV',
               'Left Soleal V',
               'muscular_calf',
-              'M610,680 C580,710 580,780 605,830',
+              'M630,660 C590,700 580,780 595,840',
               true,
-              'M602,680 C572,710 572,780 597,830',
-              { x: 570, y: 760, textAnchor: 'end' }
+              'M622,660 C582,700 572,780 587,840',
+              { x: 570, y: 740, textAnchor: 'end' }
             )}
 
             {renderVesselSegment(
               'left_GSV_CALF',
               'Left Calf GSV',
               'superficial',
-              `M530,${LANDMARK_Y.KNEE_CREASE} C515,680 520,820 530,${LANDMARK_Y.ANKLE}`,
+              `M510,${LANDMARK_Y.KNEE_CREASE} C480,680 480,820 490,${LANDMARK_Y.ANKLE}`,
               false,
               undefined,
-              { x: 515, y: 760, textAnchor: 'end' }
+              { x: 475, y: 760, textAnchor: 'end' }
             )}
           </svg>
         </div>
@@ -2045,40 +2262,40 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       {/* Permanent Compact Legend Sidebar (1 col on lg screens) */}
       <div className="lg:col-span-1 bg-slate-950/95 border border-slate-800 rounded-xl p-2.5 text-xs space-y-1.5 font-sans shadow-xl flex flex-col justify-start">
         <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800">
-          <Info className="w-4 h-4 text-teal-400 flex-shrink-0" />
+          <Info className="w-4 h-4 text-amber-400 flex-shrink-0" />
           <div>
             <h4 className="font-bold text-slate-100 text-xs uppercase tracking-wider">Venous Map Legend</h4>
-            <p className="text-[10px] text-slate-400">Color = Category • Pattern = Lumen State</p>
+            <p className="text-[10px] text-slate-400">Color = Pathology • Grey = Normal Context</p>
           </div>
         </div>
 
         <div className="space-y-1.5">
           <LegendSwatch
-            title="Normal / Patent"
-            subtitle="Clear lumen with normal flow"
-            wallColor="#059669"
-            fillColor="#059669"
+            title="NORMAL / PATENT"
+            subtitle="Assessed normal / patent vessel"
+            wallColor="#64748b"
+            fillColor="#64748b"
             lumenType="full_flow"
-            lumenColor="#34d399"
+            lumenColor="#94a3b8"
           />
           <LegendSwatch
-            title="Occlusive thrombus"
+            title="OCCLUSIVE THROMBUS"
             subtitle="Solid amber occluded lumen"
             wallColor="#d97706"
             fillColor="#d97706"
             lumenType="none"
           />
           <LegendSwatch
-            title="Non-occlusive thrombus"
-            subtitle="Partial mural thrombus with residual lumen"
+            title="NON-OCCLUSIVE THROMBUS"
+            subtitle="Amber mural pattern / open lumen"
             wallColor="#d97706"
             fillPatternUrl="url(#hatch-amber)"
             lumenType="wide_residual"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Chronic post-thrombotic"
-            subtitle="Residual wall thickening & chronic hatch pattern"
+            title="CHRONIC POST-THROMBOTIC"
+            subtitle="Irregular/dashed residual pattern"
             wallColor="#d97706"
             wallDashArray="6 3"
             fillPatternUrl="url(#hatch-amber-light)"
@@ -2086,23 +2303,23 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Synechiae / webs / strands"
-            subtitle="Patent lumen with intraluminal strands"
+            title="SYNECHIAE / WEBS / STRANDS"
+            subtitle="Intraluminal strand pattern"
             wallColor="#d97706"
             fillPatternUrl="url(#hatch-amber)"
             lumenType="synechiae_strands"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Not visualised (NV)"
-            subtitle="Grey dotted vessel outline (unseen)"
+            title="NOT VISUALISED (NV)"
+            subtitle="Grey dotted/broken outline"
             wallColor="#94a3b8"
-            wallDashArray="2 3"
+            wallDashArray="3 3"
             lumenType="none_faint"
           />
           <LegendSwatch
-            title="Not examined (NA)"
-            subtitle="Faint neutral outline (out of scope)"
+            title="NOT EXAMINED (NA)"
+            subtitle="Very faint grey outline"
             wallColor="#334155"
             wallDashArray="5 4"
             lumenType="none_faint"

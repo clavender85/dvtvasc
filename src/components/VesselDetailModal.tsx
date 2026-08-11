@@ -1,14 +1,62 @@
 // Detailed Vessel Abnormality Card & Editor Modal
 
 import React from 'react';
-import { VesselFinding, Compressibility, Patency, ThrombusEchogenicity, SonographicChronicity, MorphologyOption, Landmark, NonVisualizationReason, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
+import { VesselFinding, Compressibility, Patency, ThrombusEchogenicity, SonographicChronicity, MorphologyOption, Landmark, NonVisualizationReason, NON_VISUALIZATION_REASON_LABELS, ExtentRelation, EXTENT_RELATION_LABELS } from '../types/dvt';
 import { LANDMARK_LABELS } from '../data/anatomyData';
+import { formatExtent } from '../utils/reportGenerator';
 import { X, CheckCircle, AlertTriangle, ShieldAlert, EyeOff, Info } from 'lucide-react';
 
 interface VesselDetailModalProps {
   finding: VesselFinding | null;
   onClose: () => void;
   onSaveFinding: (updatedFinding: VesselFinding) => void;
+}
+
+const LANDMARK_KEYS: Landmark[] = [
+  'knee_crease',
+  'SFJ',
+  'SPJ',
+  'groin_crease',
+  'inguinal_ligament',
+  'profunda_fv_junction',
+  'adductor_canal',
+  'fibular_head',
+  'proximal_calf',
+  'mid_calf',
+  'ankle_crease',
+  'medial_malleolus',
+  'lateral_malleolus',
+  'common_iliac_junction',
+  'custom'
+];
+
+function getRelationOptionsForLandmark(landmark?: Landmark): Array<{ key: ExtentRelation; label: string }> {
+  const isJunction = landmark && ['SFJ', 'SPJ', 'profunda_fv_junction', 'common_iliac_junction'].includes(landmark);
+  if (isJunction) {
+    return [
+      { key: 'distal_to', label: 'Distal to' },
+      { key: 'proximal_to', label: 'Proximal to' },
+      { key: 'at', label: 'At' },
+      { key: 'extending_to', label: 'Extending to' },
+      { key: 'extending_through', label: 'Extending through' },
+      { key: 'above', label: 'Above' },
+      { key: 'below', label: 'Below' },
+      { key: 'superior_to', label: 'Superior to' },
+      { key: 'inferior_to', label: 'Inferior to' }
+    ];
+  }
+
+  return [
+    { key: 'above', label: 'Above' },
+    { key: 'below', label: 'Below' },
+    { key: 'at', label: 'At' },
+    { key: 'proximal_to', label: 'Proximal to' },
+    { key: 'distal_to', label: 'Distal to' },
+    { key: 'extending_to', label: 'Extending to' },
+    { key: 'extending_through', label: 'Extending through' },
+    { key: 'superior_to', label: 'Superior to' },
+    { key: 'inferior_to', label: 'Inferior to' }
+  ];
 }
 
 const MORPHOLOGY_ITEMS: Array<{ id: MorphologyOption; label: string }> = [
@@ -254,125 +302,345 @@ export const VesselDetailModal: React.FC<VesselDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Landmark Extent Fields */}
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-3">
-                <span className="font-bold text-teal-400 uppercase tracking-wider text-[11px] block">
-                  LANDMARK-BASED THROMBUS EXTENT
-                </span>
-
-                {/* Proximal Extent */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
-                  <span className="text-slate-400 font-semibold">Proximal Extent:</span>
-                  <input
-                    type="number"
-                    placeholder="Distance"
-                    value={finding.proximalExtent?.distance ?? ''}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        proximalExtent: {
-                          distance: e.target.value ? Number(e.target.value) : null,
-                          unit: finding.proximalExtent?.unit || 'mm',
-                          relation: finding.proximalExtent?.relation || 'above',
-                          landmark: finding.proximalExtent?.landmark || 'knee_crease'
-                        }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
-                  />
-                  <select
-                    value={finding.proximalExtent?.unit || 'mm'}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        proximalExtent: {
-                          ...(finding.proximalExtent as any),
-                          unit: e.target.value as any
-                        }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
-                  >
-                    <option value="mm">mm</option>
-                    <option value="cm">cm</option>
-                  </select>
-                  <select
-                    value={finding.proximalExtent?.landmark || 'knee_crease'}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        proximalExtent: {
-                          ...(finding.proximalExtent as any),
-                          landmark: e.target.value as Landmark
-                        }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 truncate"
-                  >
-                    {Object.entries(LANDMARK_LABELS).map(([k, label]) => (
-                      <option key={k} value={k}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+              {/* Structured Landmark Extent Fields */}
+              <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-lg space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span className="font-bold text-teal-400 uppercase tracking-wider text-[11px] block">
+                    LANDMARK-BASED THROMBUS EXTENT
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    [ Distance ] [ Unit ] [ Relationship ] [ Landmark ]
+                  </span>
                 </div>
 
-                {/* Distal Extent */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
-                  <span className="text-slate-400 font-semibold">Distal Extent:</span>
-                  <input
-                    type="number"
-                    placeholder="Distance"
-                    value={finding.distalExtent?.distance ?? ''}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        distalExtent: {
-                          distance: e.target.value ? Number(e.target.value) : null,
-                          unit: finding.distalExtent?.unit || 'mm',
-                          relation: finding.distalExtent?.relation || 'below',
-                          landmark: finding.distalExtent?.landmark || 'knee_crease'
+                {/* Proximal Extent Row */}
+                <div className="space-y-1">
+                  <span className="text-slate-300 font-bold text-xs block">PROXIMAL EXTENT</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center">
+                    {/* Distance */}
+                    <div className="sm:col-span-3">
+                      <input
+                        type="number"
+                        placeholder="Distance"
+                        value={finding.proximalExtent?.distance ?? ''}
+                        onChange={(e) => {
+                          const dist = e.target.value !== '' ? Number(e.target.value) : null;
+                          const currentLM = finding.proximalExtent?.landmark || 'knee_crease';
+                          let defaultRel = finding.proximalExtent?.relation || '';
+                          if (!defaultRel && dist !== null) {
+                            defaultRel = ['SFJ', 'SPJ', 'profunda_fv_junction'].includes(currentLM) ? 'distal_to' : 'above';
+                          }
+                          onSaveFinding({
+                            ...finding,
+                            proximalExtent: {
+                              distance: dist,
+                              unit: finding.proximalExtent?.unit || 'mm',
+                              relation: defaultRel,
+                              landmark: currentLM,
+                              customLandmark: finding.proximalExtent?.customLandmark
+                            }
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    {/* Unit */}
+                    <div className="sm:col-span-2">
+                      <select
+                        value={finding.proximalExtent?.unit || 'mm'}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            proximalExtent: {
+                              distance: finding.proximalExtent?.distance ?? null,
+                              unit: e.target.value as 'mm' | 'cm',
+                              relation: finding.proximalExtent?.relation || '',
+                              landmark: finding.proximalExtent?.landmark || 'knee_crease',
+                              customLandmark: finding.proximalExtent?.customLandmark
+                            }
+                          })
                         }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
-                  />
-                  <select
-                    value={finding.distalExtent?.unit || 'mm'}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        distalExtent: {
-                          ...(finding.distalExtent as any),
-                          unit: e.target.value as any
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-teal-500"
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                      </select>
+                    </div>
+
+                    {/* Relationship */}
+                    <div className="sm:col-span-3">
+                      <select
+                        value={finding.proximalExtent?.relation || ''}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            proximalExtent: {
+                              distance: finding.proximalExtent?.distance ?? null,
+                              unit: finding.proximalExtent?.unit || 'mm',
+                              relation: e.target.value as ExtentRelation | '',
+                              landmark: finding.proximalExtent?.landmark || 'knee_crease',
+                              customLandmark: finding.proximalExtent?.customLandmark
+                            }
+                          })
                         }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100"
-                  >
-                    <option value="mm">mm</option>
-                    <option value="cm">cm</option>
-                  </select>
-                  <select
-                    value={finding.distalExtent?.landmark || 'knee_crease'}
-                    onChange={(e) =>
-                      onSaveFinding({
-                        ...finding,
-                        distalExtent: {
-                          ...(finding.distalExtent as any),
-                          landmark: e.target.value as Landmark
-                        }
-                      })
-                    }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 truncate"
-                  >
-                    {Object.entries(LANDMARK_LABELS).map(([k, label]) => (
-                      <option key={k} value={k}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                        className={`w-full bg-slate-950 border rounded px-2 py-1.5 text-xs focus:outline-none ${
+                          finding.proximalExtent?.distance !== null &&
+                          finding.proximalExtent?.distance !== undefined &&
+                          finding.proximalExtent.distance > 0 &&
+                          !finding.proximalExtent.relation
+                            ? 'border-amber-500 text-amber-200'
+                            : 'border-slate-700 text-slate-100 focus:border-teal-500'
+                        }`}
+                      >
+                        <option value="">-- Direction --</option>
+                        {getRelationOptionsForLandmark(finding.proximalExtent?.landmark).map((opt) => (
+                          <option key={opt.key} value={opt.key}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Landmark */}
+                    <div className="sm:col-span-4">
+                      <select
+                        value={finding.proximalExtent?.landmark || 'knee_crease'}
+                        onChange={(e) => {
+                          const newLM = e.target.value as Landmark;
+                          let newRel = finding.proximalExtent?.relation || '';
+                          if (!newRel && finding.proximalExtent?.distance) {
+                            newRel = ['SFJ', 'SPJ', 'profunda_fv_junction'].includes(newLM) ? 'distal_to' : 'above';
+                          }
+                          onSaveFinding({
+                            ...finding,
+                            proximalExtent: {
+                              distance: finding.proximalExtent?.distance ?? null,
+                              unit: finding.proximalExtent?.unit || 'mm',
+                              relation: newRel,
+                              landmark: newLM,
+                              customLandmark: finding.proximalExtent?.customLandmark
+                            }
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-100 truncate focus:outline-none focus:border-teal-500"
+                      >
+                        {LANDMARK_KEYS.map((k) => (
+                          <option key={k} value={k}>
+                            {LANDMARK_LABELS[k] || k}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Custom Landmark text if 'custom' */}
+                  {finding.proximalExtent?.landmark === 'custom' && (
+                    <input
+                      type="text"
+                      placeholder="Specify custom proximal landmark name..."
+                      value={finding.proximalExtent.customLandmark || ''}
+                      onChange={(e) =>
+                        onSaveFinding({
+                          ...finding,
+                          proximalExtent: {
+                            ...finding.proximalExtent!,
+                            customLandmark: e.target.value
+                          }
+                        })
+                      }
+                      className="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200"
+                    />
+                  )}
+
+                  {/* Validation inline prompts for Proximal */}
+                  {finding.proximalExtent?.distance !== null &&
+                    finding.proximalExtent?.distance !== undefined &&
+                    finding.proximalExtent.distance > 0 &&
+                    !finding.proximalExtent.relation && (
+                      <p className="text-[11px] font-semibold text-amber-400 mt-0.5 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-400 inline flex-shrink-0" />
+                        Specify relationship to landmark (e.g. Above / Distal to).
+                      </p>
+                    )}
+                  {finding.proximalExtent?.distance === 0 &&
+                    !['at', 'extending_to', 'extending_through'].includes(finding.proximalExtent?.relation || '') && (
+                      <p className="text-[11px] text-teal-300/90 mt-0.5 italic">
+                        Tip: For zero distance, consider selecting 'At' or 'Extending to'.
+                      </p>
+                    )}
                 </div>
+
+                {/* Distal Extent Row */}
+                <div className="space-y-1 pt-2 border-t border-slate-800/80">
+                  <span className="text-slate-300 font-bold text-xs block">DISTAL EXTENT</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center">
+                    {/* Distance */}
+                    <div className="sm:col-span-3">
+                      <input
+                        type="number"
+                        placeholder="Distance"
+                        value={finding.distalExtent?.distance ?? ''}
+                        onChange={(e) => {
+                          const dist = e.target.value !== '' ? Number(e.target.value) : null;
+                          const currentLM = finding.distalExtent?.landmark || 'knee_crease';
+                          let defaultRel = finding.distalExtent?.relation || '';
+                          if (!defaultRel && dist !== null) {
+                            defaultRel = ['SFJ', 'SPJ', 'profunda_fv_junction'].includes(currentLM) ? 'distal_to' : 'below';
+                          }
+                          onSaveFinding({
+                            ...finding,
+                            distalExtent: {
+                              distance: dist,
+                              unit: finding.distalExtent?.unit || 'mm',
+                              relation: defaultRel,
+                              landmark: currentLM,
+                              customLandmark: finding.distalExtent?.customLandmark
+                            }
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    {/* Unit */}
+                    <div className="sm:col-span-2">
+                      <select
+                        value={finding.distalExtent?.unit || 'mm'}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            distalExtent: {
+                              distance: finding.distalExtent?.distance ?? null,
+                              unit: e.target.value as 'mm' | 'cm',
+                              relation: finding.distalExtent?.relation || '',
+                              landmark: finding.distalExtent?.landmark || 'knee_crease',
+                              customLandmark: finding.distalExtent?.customLandmark
+                            }
+                          })
+                        }
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-teal-500"
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                      </select>
+                    </div>
+
+                    {/* Relationship */}
+                    <div className="sm:col-span-3">
+                      <select
+                        value={finding.distalExtent?.relation || ''}
+                        onChange={(e) =>
+                          onSaveFinding({
+                            ...finding,
+                            distalExtent: {
+                              distance: finding.distalExtent?.distance ?? null,
+                              unit: finding.distalExtent?.unit || 'mm',
+                              relation: e.target.value as ExtentRelation | '',
+                              landmark: finding.distalExtent?.landmark || 'knee_crease',
+                              customLandmark: finding.distalExtent?.customLandmark
+                            }
+                          })
+                        }
+                        className={`w-full bg-slate-950 border rounded px-2 py-1.5 text-xs focus:outline-none ${
+                          finding.distalExtent?.distance !== null &&
+                          finding.distalExtent?.distance !== undefined &&
+                          finding.distalExtent.distance > 0 &&
+                          !finding.distalExtent.relation
+                            ? 'border-amber-500 text-amber-200'
+                            : 'border-slate-700 text-slate-100 focus:border-teal-500'
+                        }`}
+                      >
+                        <option value="">-- Direction --</option>
+                        {getRelationOptionsForLandmark(finding.distalExtent?.landmark).map((opt) => (
+                          <option key={opt.key} value={opt.key}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Landmark */}
+                    <div className="sm:col-span-4">
+                      <select
+                        value={finding.distalExtent?.landmark || 'knee_crease'}
+                        onChange={(e) => {
+                          const newLM = e.target.value as Landmark;
+                          let newRel = finding.distalExtent?.relation || '';
+                          if (!newRel && finding.distalExtent?.distance) {
+                            newRel = ['SFJ', 'SPJ', 'profunda_fv_junction'].includes(newLM) ? 'distal_to' : 'below';
+                          }
+                          onSaveFinding({
+                            ...finding,
+                            distalExtent: {
+                              distance: finding.distalExtent?.distance ?? null,
+                              unit: finding.distalExtent?.unit || 'mm',
+                              relation: newRel,
+                              landmark: newLM,
+                              customLandmark: finding.distalExtent?.customLandmark
+                            }
+                          });
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-100 truncate focus:outline-none focus:border-teal-500"
+                      >
+                        {LANDMARK_KEYS.map((k) => (
+                          <option key={k} value={k}>
+                            {LANDMARK_LABELS[k] || k}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Custom Landmark text if 'custom' */}
+                  {finding.distalExtent?.landmark === 'custom' && (
+                    <input
+                      type="text"
+                      placeholder="Specify custom distal landmark name..."
+                      value={finding.distalExtent.customLandmark || ''}
+                      onChange={(e) =>
+                        onSaveFinding({
+                          ...finding,
+                          distalExtent: {
+                            ...finding.distalExtent!,
+                            customLandmark: e.target.value
+                          }
+                        })
+                      }
+                      className="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200"
+                    />
+                  )}
+
+                  {/* Validation inline prompts for Distal */}
+                  {finding.distalExtent?.distance !== null &&
+                    finding.distalExtent?.distance !== undefined &&
+                    finding.distalExtent.distance > 0 &&
+                    !finding.distalExtent.relation && (
+                      <p className="text-[11px] font-semibold text-amber-400 mt-0.5 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-400 inline flex-shrink-0" />
+                        Specify relationship to landmark (e.g. Below / Distal to).
+                      </p>
+                    )}
+                  {finding.distalExtent?.distance === 0 &&
+                    !['at', 'extending_to', 'extending_through'].includes(finding.distalExtent?.relation || '') && (
+                      <p className="text-[11px] text-teal-300/90 mt-0.5 italic">
+                        Tip: For zero distance, consider selecting 'At' or 'Extending to'.
+                      </p>
+                    )}
+                </div>
+
+                {/* Formatted Summary Preview */}
+                {formatExtent(finding) && (
+                  <div className="mt-2.5 p-2 bg-slate-950/90 border border-teal-800/80 rounded text-xs font-mono text-teal-300 flex items-start gap-2">
+                    <Info className="w-3.5 h-3.5 text-teal-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-300 uppercase text-[10px] block">
+                        Live Generated Report Excerpt:
+                      </span>
+                      <span>"{formatExtent(finding)}"</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Special Superficial Distance to Junction (SFJ / SPJ) */}

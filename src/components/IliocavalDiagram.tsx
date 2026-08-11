@@ -156,10 +156,10 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
 
     if (finding.status === 'normal') {
       return {
-        wallColor: '#059669',
+        wallColor: '#64748b',
         wallWidth: calculatedWidth,
-        fillColor: '#059669',
-        lumenColor: '#34d399',
+        fillColor: '#64748b',
+        lumenColor: '#94a3b8',
         statusText: 'Normal Patent',
         opacity: 0.95
       };
@@ -784,7 +784,7 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
                   hoveredFinding.status === 'abnormal'
                     ? 'bg-rose-950 text-rose-300 border border-rose-800'
                     : hoveredFinding.status === 'normal'
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    ? 'bg-slate-800 text-slate-300 border border-slate-700'
                     : hoveredFinding.status === 'not_visualised'
                     ? 'bg-amber-950 text-amber-300 border border-amber-800'
                     : 'bg-slate-800 text-slate-400'

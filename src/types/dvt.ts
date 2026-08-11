@@ -92,10 +92,33 @@ export type Landmark =
   | 'common_iliac_junction'
   | 'custom';
 
+export type ExtentRelation =
+  | 'above'
+  | 'below'
+  | 'at'
+  | 'proximal_to'
+  | 'distal_to'
+  | 'extending_to'
+  | 'extending_through'
+  | 'superior_to'
+  | 'inferior_to';
+
+export const EXTENT_RELATION_LABELS: Record<ExtentRelation, string> = {
+  above: 'Above',
+  below: 'Below',
+  at: 'At',
+  proximal_to: 'Proximal to',
+  distal_to: 'Distal to',
+  extending_to: 'Extending to',
+  extending_through: 'Extending through',
+  superior_to: 'Superior to',
+  inferior_to: 'Inferior to'
+};
+
 export interface ExtentLandmark {
-  distance: number | null; // in mm or cm
+  distance: number | null; // in mm or cm (optional if relation is 'at', 'extending_to', 'extending_through')
   unit: 'mm' | 'cm';
-  relation: 'above' | 'below' | 'superior_to' | 'inferior_to' | 'at';
+  relation?: ExtentRelation | ''; // directional relationship to landmark
   landmark: Landmark;
   customLandmark?: string;
 }
