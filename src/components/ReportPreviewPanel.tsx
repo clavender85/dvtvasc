@@ -1,22 +1,18 @@
 // Commercial-Grade Bidirectional Live Generated Report Preview Section
 // Directly linked to central structured exam data & report generator
+// Clean, single-summary section live preview panel
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ExamState, ReportBlock, VesselFinding } from '../types/dvt';
-import { generateStructuredReportBlocks } from '../utils/reportGenerator';
+import { ExamState, InteractiveSentence, VesselFinding } from '../types/dvt';
+import { generateConcisePreviewData } from '../utils/reportGenerator';
 import {
   FileText,
   MousePointer,
-  ExternalLink,
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
   ChevronUp,
   Sparkles,
-  Eye,
-  Edit3,
-  MapPin,
-  Filter,
   AlertCircle,
   SkipBack,
   SkipForward,
@@ -55,18 +51,16 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
   onRegenerateReport
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
-  const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
-  const [filterRelatedOnly, setFilterRelatedOnly] = useState<boolean>(false);
-  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
+  const [hoveredSentId, setHoveredSentId] = useState<string | null>(null);
 
   // QA Review Mode ("REVIEW REPORT AGAINST MAP")
   const [isQaModeActive, setIsQaModeActive] = useState<boolean>(false);
   const [qaFindingIndex, setQaFindingIndex] = useState<number>(0);
 
-  // Generate structured report blocks live from central state
-  const blocks = useMemo(() => generateStructuredReportBlocks(state), [state]);
+  // Generate concise single summary preview live from central state
+  const conciseData = useMemo(() => generateConcisePreviewData(state), [state]);
 
-  // Comprehensive Clinical Consistency Engine
+  // Comprehensive Clinical Consistency Engine for alert badge
   const conflicts = useMemo(() => {
     const list: { id: string; vesselId?: string; message: string }[] = [];
     const findings = state.vesselFindings;
@@ -128,16 +122,6 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
     return list;
   }, [state.vesselFindings, state.summaryText]);
 
-  // Extract abnormal / key findings for QA Review Mode
-  const abnormalBlocks = useMemo(() => {
-    return blocks.filter(
-      (b) =>
-        b.category === 'dvt' ||
-        b.category === 'superficial' ||
-        (b.sourceVesselIds && b.sourceVesselIds.length > 0 && b.section.includes('LOWER LIMB'))
-    );
-  }, [blocks]);
-
   // Combined active selections
   const activeSelectedIds = useMemo(() => {
     const set = new Set<string>();
@@ -146,8 +130,15 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
     return Array.from(set);
   }, [selectedVesselId, selectedVesselIds]);
 
-  // Handle Block Click -> Smooth Scroll Up + Select Anatomy on Map
-  const handleBlockClick = (block: ReportBlock, shouldScroll: boolean = true) => {
+  // Extract sentences with vessels for QA review mode
+  const qaSentences = useMemo(() => {
+    return conciseData.summarySentences.filter(
+      (s) => s.sourceVesselIds && s.sourceVesselIds.length > 0 && s.category !== 'normal'
+    );
+  }, [conciseData.summarySentences]);
+
+  // Handle sentence click -> highlight vessels & scroll up
+  const handleSentenceClick = (sent: InteractiveSentence, shouldScroll: boolean = true) => {
     if (shouldScroll) {
       const workspaceEl = document.getElementById('anatomical-map-workspace');
       if (workspaceEl) {
@@ -155,61 +146,32 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
       }
     }
 
-    if (!block.sourceVesselIds || block.sourceVesselIds.length === 0) return;
+    if (!sent.sourceVesselIds || sent.sourceVesselIds.length === 0) return;
 
-    // 1. Auto-switch region if needed
-    if (block.region === 'iliocaval' && onSwitchRegion) {
+    if (sent.region === 'iliocaval' && onSwitchRegion) {
       onSwitchRegion('iliocaval');
-    } else if (block.region === 'right_lower_limb' && onSwitchRegion) {
+    } else if (sent.region === 'right_lower_limb' && onSwitchRegion) {
       onSwitchRegion('right_lower_limb');
-    } else if (block.region === 'left_lower_limb' && onSwitchRegion) {
+    } else if (sent.region === 'left_lower_limb' && onSwitchRegion) {
       onSwitchRegion('left_lower_limb');
     }
 
-    // 2. Select Source Vessel(s)
-    if (block.sourceVesselIds.length > 1 && onSelectGroup) {
-      onSelectGroup(block.sourceVesselIds);
+    if (sent.sourceVesselIds.length > 1 && onSelectGroup) {
+      onSelectGroup(sent.sourceVesselIds);
     } else {
-      onSelectVessel(block.sourceVesselIds[0]);
-    }
-  };
-
-  // Double click block -> Open detail editor for source vessel
-  const handleBlockDoubleClick = (block: ReportBlock) => {
-    if (block.sourceVesselIds && block.sourceVesselIds.length > 0 && onOpenDetailModal) {
-      onOpenDetailModal(block.sourceVesselIds[0]);
+      onSelectVessel(sent.sourceVesselIds[0]);
     }
   };
 
   // QA Mode Stepper sync
   useEffect(() => {
-    if (isQaModeActive && abnormalBlocks.length > 0) {
-      const current = abnormalBlocks[qaFindingIndex];
+    if (isQaModeActive && qaSentences.length > 0) {
+      const current = qaSentences[qaFindingIndex];
       if (current && current.sourceVesselIds && current.sourceVesselIds.length > 0) {
-        handleBlockClick(current, true);
+        handleSentenceClick(current, true);
       }
     }
   }, [isQaModeActive, qaFindingIndex]);
-
-  // Filter blocks based on user view choices
-  const displayedBlocks = useMemo(() => {
-    if (!filterRelatedOnly || activeSelectedIds.length === 0) {
-      if (viewMode === 'compact') {
-        return blocks.filter(
-          (b) =>
-            b.section.includes('IMPRESSION') ||
-            b.category === 'dvt' ||
-            b.category === 'superficial' ||
-            b.category === 'limitation'
-        );
-      }
-      return blocks;
-    }
-
-    return blocks.filter((b) =>
-      b.sourceVesselIds?.some((vId) => activeSelectedIds.includes(vId))
-    );
-  }, [blocks, filterRelatedOnly, activeSelectedIds, viewMode]);
 
   // Helper to translate vessel IDs into human-readable anatomical names
   const getReadableSourceNames = (vesselIds?: string[]): string => {
@@ -258,7 +220,7 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
               )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Live structured report generated directly from anatomical worksheet inputs
+              Live concise findings summary generated directly from anatomical worksheet inputs
             </p>
           </div>
         </div>
@@ -278,7 +240,7 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
                 ? 'bg-amber-600 text-white border-amber-500 animate-pulse'
                 : 'bg-slate-800 text-amber-300 border-amber-800/60 hover:bg-slate-700'
             }`}
-            title="Sequentially highlight each abnormal finding and show corresponding map anatomy"
+            title="Sequentially highlight each key finding and show corresponding map anatomy"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{isQaModeActive ? 'QA Reviewing...' : 'REVIEW REPORT AGAINST MAP'}</span>
@@ -317,9 +279,6 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
               <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
               <span>Report Consistency Conflicts Detected:</span>
             </div>
-            <span className="text-[10px] bg-rose-900 px-2 py-0.5 rounded text-rose-200 uppercase font-mono">
-              Action Needed
-            </span>
           </div>
           <ul className="space-y-1 pl-6 list-disc text-rose-200/90 text-xs">
             {conflicts.map((c) => (
@@ -382,11 +341,11 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
           <div className="flex items-center gap-2 text-amber-200 text-xs">
             <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
             <span className="font-bold uppercase tracking-wider">
-              QA Mode: Reviewing Finding {abnormalBlocks.length > 0 ? qaFindingIndex + 1 : 0} of {abnormalBlocks.length}
+              QA Mode: Reviewing Finding {qaSentences.length > 0 ? qaFindingIndex + 1 : 0} of {qaSentences.length}
             </span>
           </div>
 
-          {abnormalBlocks.length > 0 ? (
+          {qaSentences.length > 0 ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -400,8 +359,8 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
 
               <button
                 type="button"
-                disabled={qaFindingIndex >= abnormalBlocks.length - 1}
-                onClick={() => setQaFindingIndex((i) => Math.min(abnormalBlocks.length - 1, i + 1))}
+                disabled={qaFindingIndex >= qaSentences.length - 1}
+                onClick={() => setQaFindingIndex((i) => Math.min(qaSentences.length - 1, i + 1))}
                 className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded font-bold flex items-center gap-1 shadow-md"
               >
                 Next
@@ -423,190 +382,85 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
         </div>
       )}
 
-      {/* Main Expanded Content */}
+      {/* Single Summary Section View */}
       {isExpanded && (
-        <div className="p-4 space-y-3 bg-slate-950/90 max-h-[500px] overflow-y-auto">
-          {/* Sub-toolbar: View Modes & Active Selection Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800 text-[11px]">
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setViewMode('full')}
-                className={`px-3 py-1 rounded font-bold transition-all ${
-                  viewMode === 'full'
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                FULL REPORT PREVIEW
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('compact')}
-                className={`px-3 py-1 rounded font-bold transition-all ${
-                  viewMode === 'compact'
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                KEY FINDINGS ONLY
-              </button>
+        <div className="p-4 bg-slate-950/90 space-y-3">
+          {/* Main Single Summary Card */}
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 shadow-inner space-y-3">
+            {/* Interactive Combined Summary Paragraph */}
+            <div className="text-slate-100 text-xs sm:text-sm font-sans leading-relaxed space-x-1">
+              {conciseData.summarySentences.map((sent) => {
+                const hasVessels = sent.sourceVesselIds && sent.sourceVesselIds.length > 0;
+                const isMatched =
+                  hasVessels && sent.sourceVesselIds?.some((id) => activeSelectedIds.includes(id));
+                const isHovered = hoveredSentId === sent.id;
+
+                return (
+                  <span
+                    key={sent.id}
+                    onMouseEnter={() => setHoveredSentId(sent.id)}
+                    onMouseLeave={() => setHoveredSentId(null)}
+                    onClick={() => handleSentenceClick(sent)}
+                    className={`inline transition-all rounded px-1 py-0.5 cursor-pointer ${
+                      isMatched
+                        ? 'bg-sky-900/90 text-sky-100 font-semibold ring-1 ring-sky-400'
+                        : isHovered
+                        ? 'bg-slate-800 text-teal-300 font-medium underline decoration-teal-500'
+                        : 'hover:bg-slate-800/80 hover:text-slate-100'
+                    }`}
+                    title={
+                      hasVessels
+                        ? `Linked Anatomy: ${getReadableSourceNames(sent.sourceVesselIds)}`
+                        : undefined
+                    }
+                  >
+                    {sent.text}{' '}
+                  </span>
+                );
+              })}
             </div>
 
-            {/* Filter Related Only Toggle */}
-            {activeSelectedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setFilterRelatedOnly(!filterRelatedOnly)}
-                className={`px-2.5 py-1 rounded font-bold flex items-center gap-1.5 transition-all border ${
-                  filterRelatedOnly
-                    ? 'bg-sky-950 text-sky-300 border-sky-700 shadow-sm'
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+            {/* Optional Key Impression Line */}
+            {conciseData.keyImpression && (
+              <div
+                onClick={() => {
+                  if (conciseData.impressionVesselIds && conciseData.impressionVesselIds.length > 0) {
+                    if (conciseData.impressionVesselIds.length > 1 && onSelectGroup) {
+                      onSelectGroup(conciseData.impressionVesselIds);
+                    } else {
+                      onSelectVessel(conciseData.impressionVesselIds[0]);
+                    }
+                    const workspaceEl = document.getElementById('anatomical-map-workspace');
+                    if (workspaceEl) workspaceEl.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className={`pt-2.5 border-t border-slate-800 flex items-start gap-2 cursor-pointer rounded p-1.5 transition-all ${
+                  conciseData.hasPathology
+                    ? 'bg-amber-950/40 border-amber-900/60 hover:bg-amber-900/50'
+                    : 'hover:bg-slate-800/60'
                 }`}
               >
-                <Filter className="w-3.5 h-3.5 text-sky-400" />
-                <span>Show Selected Anatomy Findings Only ({activeSelectedIds.length})</span>
-              </button>
-            )}
-
-            <span className="text-slate-400 text-xs italic hidden sm:inline">
-              Single-click sentence to show on map | Double-click sentence to edit vessel details
-            </span>
-          </div>
-
-          {/* Render Structured Report Blocks */}
-          {displayedBlocks.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 italic">
-              No matching report findings found for current filter.
-            </div>
-          ) : (
-            displayedBlocks.map((block) => {
-              const hasVessels = block.sourceVesselIds && block.sourceVesselIds.length > 0;
-              const isSourceMatched =
-                hasVessels &&
-                block.sourceVesselIds?.some((vId) => activeSelectedIds.includes(vId));
-              const isHovered = hoveredBlockId === block.id;
-
-              return (
-                <div
-                  key={block.id}
-                  onMouseEnter={() => setHoveredBlockId(block.id)}
-                  onMouseLeave={() => setHoveredBlockId(null)}
-                  onClick={() => handleBlockClick(block, true)}
-                  onDoubleClick={() => handleBlockDoubleClick(block)}
-                  className={`p-3.5 rounded-lg border transition-all relative ${
-                    isSourceMatched
-                      ? 'bg-sky-950/80 border-sky-500 shadow-xl ring-2 ring-sky-500/50'
-                      : isHovered
-                      ? 'bg-slate-850 border-teal-600/80 cursor-pointer shadow-md'
-                      : hasVessels
-                      ? 'bg-slate-900 border-slate-800 hover:border-slate-700 cursor-pointer'
-                      : 'bg-slate-900/50 border-slate-800/60 text-slate-300'
+                <span className="font-bold text-xs uppercase tracking-wider text-teal-400 flex-shrink-0">
+                  KEY IMPRESSION:
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    conciseData.hasPathology ? 'text-amber-300' : 'text-slate-200'
                   }`}
                 >
-                  {/* Block Header */}
-                  <div className="flex items-center justify-between gap-2 mb-1.5 font-sans">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400">
-                        {block.section}
-                      </span>
-                      {block.category === 'dvt' && (
-                        <span className="bg-amber-950 text-amber-300 border border-amber-800/80 text-[9px] font-bold px-1.5 py-0.2 rounded">
-                          PATHOLOGY
-                        </span>
-                      )}
-                      {block.category === 'limitation' && (
-                        <span className="bg-amber-950/80 text-amber-400 border border-amber-800/80 text-[9px] font-bold px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          LIMITATION
-                        </span>
-                      )}
-                      {isSourceMatched && (
-                        <span className="bg-sky-900 text-sky-200 border border-sky-600 text-[9px] font-bold px-1.5 py-0.2 rounded animate-pulse">
-                          ACTIVE MAP MATCH
-                        </span>
-                      )}
-                    </div>
+                  "{conciseData.keyImpression}"
+                </span>
+              </div>
+            )}
+          </div>
 
-                    {/* Source Anatomy Badge */}
-                    {hasVessels && (
-                      <span
-                        className="text-[10px] font-bold text-slate-400 hover:text-teal-300 flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800"
-                        title={`Source Anatomy: ${getReadableSourceNames(block.sourceVesselIds)}`}
-                      >
-                        <MousePointer className="w-3 h-3 text-teal-400" />
-                        <span>Source ({block.sourceVesselIds?.length})</span>
-                      </span>
-                    )}
-                  </div>
+          {/* Bottom Footer Actions & Hint */}
+          <div className="pt-1 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
+              <MousePointer className="w-3.5 h-3.5 text-teal-400" />
+              <span>Click any sentence to highlight linked vessels on the anatomical map</span>
+            </div>
 
-                  {/* Report Block Wording */}
-                  <div className="whitespace-pre-wrap font-mono text-slate-100 text-xs leading-relaxed">
-                    {block.text}
-                  </div>
-
-                  {/* Hover Bar showing Source Vessels & Contextual Actions */}
-                  {isHovered && hasVessels && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-sans">
-                      <div className="text-slate-400 flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                        <span>
-                          Source Vessel(s):{' '}
-                          <strong className="text-teal-300 font-semibold">
-                            {getReadableSourceNames(block.sourceVesselIds)}
-                          </strong>
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBlockClick(block, true);
-                          }}
-                          className="px-2.5 py-1 bg-teal-950 hover:bg-teal-900 text-teal-300 border border-teal-800 rounded font-bold flex items-center gap-1 shadow-sm"
-                        >
-                          <Eye className="w-3 h-3" />
-                          SHOW ON MAP
-                        </button>
-
-                        {onOpenDetailModal && block.sourceVesselIds && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenDetailModal(block.sourceVesselIds![0]);
-                            }}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded font-bold flex items-center gap-1"
-                          >
-                            <Edit3 className="w-3 h-3 text-slate-400" />
-                            Edit Finding
-                          </button>
-                        )}
-
-                        {block.category === 'comparison' && onNavigateToComparison && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigateToComparison();
-                            }}
-                            className="px-2.5 py-1 bg-purple-950 hover:bg-purple-900 text-purple-200 border border-purple-800 rounded font-bold"
-                          >
-                            VIEW COMPARISON
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-
-          {/* Bottom Footer Actions */}
-          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 font-sans text-xs">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -619,18 +473,18 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>REVIEW REPORT AGAINST MAP</span>
               </button>
-            </div>
 
-            {onNavigateToReportTab && (
-              <button
-                type="button"
-                onClick={onNavigateToReportTab}
-                className="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-md transition-colors"
-              >
-                <span>OPEN FULL REPORT</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </button>
-            )}
+              {onNavigateToReportTab && (
+                <button
+                  type="button"
+                  onClick={onNavigateToReportTab}
+                  className="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-md transition-colors"
+                >
+                  <span>OPEN FULL REPORT</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

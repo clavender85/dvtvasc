@@ -546,6 +546,21 @@ export interface ReportBlock {
   category?: 'dvt' | 'superficial' | 'doppler' | 'other' | 'normal' | 'limitation' | 'comparison' | 'header';
 }
 
+export interface InteractiveSentence {
+  id: string;
+  text: string;
+  sourceVesselIds?: string[];
+  region?: 'iliocaval' | 'right_lower_limb' | 'left_lower_limb' | 'global';
+  category?: 'study_info' | 'normal' | 'dvt' | 'doppler' | 'superficial' | 'limitation' | 'other' | 'comparison';
+}
+
+export interface ConcisePreviewData {
+  summarySentences: InteractiveSentence[];
+  keyImpression: string;
+  impressionVesselIds?: string[];
+  hasPathology: boolean;
+}
+
 export interface ExamState {
   header: PatientHeader;
   history: PreviousHistory;

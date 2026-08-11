@@ -8,7 +8,9 @@ import {
   Patency,
   Compressibility,
   NON_VISUALIZATION_REASON_LABELS,
-  ReportBlock
+  ReportBlock,
+  InteractiveSentence,
+  ConcisePreviewData
 } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
 import { generateIntervalComparisonSummary, generateKeyComparisonFinding } from './comparisonEngine';
@@ -621,4 +623,258 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
 export function generateSonographerSummary(state: ExamState): string {
   const blocks = generateStructuredReportBlocks(state);
   return blocks.map((b) => b.text).join('\n\n');
+}
+
+export function generateConcisePreviewData(state: ExamState): ConcisePreviewData {
+  const { header, vesselFindings, doppler, otherFindings, limitations, comparisons, comparisonState } = state;
+  const scope = getNormalizedScope(header);
+  const sentences: InteractiveSentence[] = [];
+
+  const isRightExamined = scope.regionsExamined.rightLowerLimb;
+  const isLeftExamined = scope.regionsExamined.leftLowerLimb;
+  const isBilateral = isRightExamined && isLeftExamined;
+
+  let sideText = 'bilateral lower limbs';
+  if (!isBilateral) {
+    if (isRightExamined) sideText = 'right lower limb';
+    else if (isLeftExamined) sideText = 'left lower limb';
+  }
+
+  // Indications text
+  const indicationStr =
+    header.indications && header.indications.length > 0
+      ? ` for ${header.indications.join(' and ')}`
+      : '';
+
+  // Deep & Superficial Findings
+  const allVesselFindingsList = Object.values(vesselFindings) as VesselFinding[];
+  const deepAbnormalList = allVesselFindingsList.filter(
+    (f) => f.category !== 'superficial' && f.status === 'abnormal'
+  );
+
+  const superficialAbnormal = allVesselFindingsList.filter(
+    (f) => f.category === 'superficial' && f.status === 'abnormal'
+  );
+
+  const hasDeepDvt = deepAbnormalList.length > 0;
+  const hasPathology = hasDeepDvt || superficialAbnormal.length > 0;
+
+  // --- 1. DEEP VENOUS FINDINGS ---
+  if (!hasDeepDvt) {
+    if (isBilateral) {
+      sentences.push({
+        id: 'sent-deep-normal',
+        text: `Venous duplex ultrasound of the bilateral lower limbs was performed${indicationStr}. The assessed deep veins demonstrate normal compressibility, patency and wall features from the common femoral veins to the distal calf veins bilaterally, with no deep venous thrombosis identified.`,
+        sourceVesselIds: [
+          'right_CFV', 'right_FV', 'right_POPV', 'right_PTV', 'right_PERV',
+          'left_CFV', 'left_FV', 'left_POPV', 'left_PTV', 'left_PERV'
+        ],
+        region: 'global',
+        category: 'normal'
+      });
+    } else {
+      const sideVesselPrefix = isRightExamined ? 'right_' : 'left_';
+      sentences.push({
+        id: 'sent-deep-normal',
+        text: `Venous duplex ultrasound of the ${sideText} demonstrates normal compressibility, patency and wall features throughout the assessed deep veins, with no deep venous thrombosis identified.`,
+        sourceVesselIds: [
+          `${sideVesselPrefix}CFV`, `${sideVesselPrefix}FV`, `${sideVesselPrefix}POPV`,
+          `${sideVesselPrefix}PTV`, `${sideVesselPrefix}PERV`
+        ],
+        region: isRightExamined ? 'right_lower_limb' : 'left_lower_limb',
+        category: 'normal'
+      });
+    }
+  } else {
+    // Deep DVT Present
+    const abnormalDescs: string[] = [];
+    const dvtVesselIds: string[] = [];
+
+    ['right', 'left'].forEach((side) => {
+      const sideAbnormals = deepAbnormalList.filter((f) => f.side === side);
+      if (sideAbnormals.length > 0) {
+        sideAbnormals.forEach((f) => dvtVesselIds.push(f.id));
+        const names = sideAbnormals.map((f) => f.vesselName).join(', ');
+        const mainChronicity = sideAbnormals[0].chronicity
+          ? formatChronicity(sideAbnormals[0].chronicity)
+          : 'acute-appearing';
+        const mainPatency = sideAbnormals[0].patency
+          ? formatPatency(sideAbnormals[0].patency)
+          : 'occlusive';
+        const extentStr = formatExtent(sideAbnormals[0]);
+
+        abnormalDescs.push(
+          `${mainPatency} ${mainChronicity} thrombus within the ${side} ${names}${extentStr ? ' ' + extentStr : ''}`
+        );
+      }
+    });
+
+    const dvtDetailText = abnormalDescs.join('; and ');
+
+    sentences.push({
+      id: 'sent-dvt-pathology',
+      text: `Venous duplex ultrasound of the ${sideText} demonstrates ${dvtDetailText}.`,
+      sourceVesselIds: dvtVesselIds,
+      region: isBilateral ? 'global' : isRightExamined ? 'right_lower_limb' : 'left_lower_limb',
+      category: 'dvt'
+    });
+
+    // Remaining deep veins
+    sentences.push({
+      id: 'sent-dvt-remaining',
+      text: `The remaining assessed deep veins are patent and compressible.`,
+      sourceVesselIds: dvtVesselIds,
+      region: 'global',
+      category: 'normal'
+    });
+  }
+
+  // --- 2. SPECTRAL DOPPLER ---
+  const rCFV = vesselFindings['right_CFV']?.doppler?.phasicity || doppler.rightCFVPhasicity || 'phasic';
+  const lCFV = vesselFindings['left_CFV']?.doppler?.phasicity || doppler.leftCFVPhasicity || 'phasic';
+  const rPop = vesselFindings['right_POPV']?.doppler?.phasicity || doppler.rightPopPhasicity || 'phasic';
+  const lPop = vesselFindings['left_POPV']?.doppler?.phasicity || doppler.leftPopPhasicity || 'phasic';
+
+  const rAug = vesselFindings['right_POPV']?.doppler?.augmentation || doppler.rightAugmentation || 'not_assessed';
+  const lAug = vesselFindings['left_POPV']?.doppler?.augmentation || doppler.leftAugmentation || 'not_assessed';
+
+  let dopplerSentenceText = '';
+  const dopplerVesselIds: string[] = [];
+
+  if (isBilateral) {
+    dopplerVesselIds.push('right_CFV', 'left_CFV', 'right_POPV', 'left_POPV');
+
+    if (rCFV === 'phasic' && lCFV === 'phasic' && rPop === 'phasic' && lPop === 'phasic') {
+      if (rAug === 'normal_augmentation' && lAug === 'normal_augmentation') {
+        dopplerSentenceText = 'Venous flow is phasic in the common femoral and popliteal veins bilaterally, with normal distal augmentation.';
+      } else if (rAug === 'normal_augmentation' || lAug === 'normal_augmentation') {
+        dopplerSentenceText = 'Venous flow is phasic in the common femoral and popliteal veins bilaterally, with distal augmentation demonstrated.';
+      } else {
+        dopplerSentenceText = 'Venous flow is phasic in the common femoral and popliteal veins bilaterally.';
+      }
+    } else {
+      const dopplerParts: string[] = [];
+      if (rCFV === 'phasic') dopplerParts.push('Right CFV flow is phasic');
+      else dopplerParts.push(`Right CFV flow is ${rCFV.replace(/_/g, ' ')}`);
+
+      if (lCFV === 'phasic') dopplerParts.push('left CFV flow is phasic');
+      else dopplerParts.push(`left CFV flow is ${lCFV.replace(/_/g, ' ')}`);
+
+      dopplerSentenceText = `${dopplerParts.join(', ')}.`;
+    }
+  } else {
+    // Unilateral
+    const sidePrefix = isRightExamined ? 'right_' : 'left_';
+    dopplerVesselIds.push(`${sidePrefix}CFV`, `${sidePrefix}POPV`);
+
+    const sideCFV = isRightExamined ? rCFV : lCFV;
+    const sidePop = isRightExamined ? rPop : lPop;
+    const sideAug = isRightExamined ? rAug : lAug;
+
+    if (sideCFV === 'phasic' && sidePop === 'phasic') {
+      if (sideAug === 'normal_augmentation') {
+        dopplerSentenceText = 'Common femoral and popliteal venous flow is phasic with normal distal augmentation.';
+      } else {
+        dopplerSentenceText = 'Common femoral and popliteal venous flow is phasic.';
+      }
+    } else if (sideCFV === 'phasic') {
+      dopplerSentenceText = `Common femoral venous phasicity is preserved. Popliteal vein flow is ${sidePop.replace(/_/g, ' ')}.`;
+    } else {
+      dopplerSentenceText = `Common femoral vein flow is ${sideCFV.replace(/_/g, ' ')}. Popliteal vein flow is ${sidePop.replace(/_/g, ' ')}.`;
+    }
+  }
+
+  if (dopplerSentenceText) {
+    sentences.push({
+      id: 'sent-doppler',
+      text: dopplerSentenceText,
+      sourceVesselIds: dopplerVesselIds,
+      region: isBilateral ? 'global' : isRightExamined ? 'right_lower_limb' : 'left_lower_limb',
+      category: 'doppler'
+    });
+  }
+
+  // --- 3. SUPERFICIAL THROMBOSIS ---
+  if (superficialAbnormal.length > 0) {
+    superficialAbnormal.forEach((f) => {
+      let supMsg = `Superficial venous thrombosis is identified in the ${f.side} ${f.vesselName}`;
+      if (f.distanceToJunction && f.distanceToJunction.distanceMm !== undefined) {
+        supMsg += `, terminating ${f.distanceToJunction.distanceMm} mm inferior to the ${f.distanceToJunction.junction}`;
+      }
+      supMsg += '.';
+      sentences.push({
+        id: `sent-superficial-${f.id}`,
+        text: supMsg,
+        sourceVesselIds: [f.id],
+        region: f.side === 'right' ? 'right_lower_limb' : 'left_lower_limb',
+        category: 'superficial'
+      });
+    });
+  }
+
+  // --- 4. OTHER FINDINGS CONCISE SENTENCE ---
+  if (otherFindings && otherFindings.length > 0) {
+    otherFindings.forEach((of, idx) => {
+      let othMsg = `A ${of.type.toLowerCase()} is noted in the ${of.side} ${of.location}`;
+      if (of.dimensionsText) othMsg += ` (${of.dimensionsText})`;
+      othMsg += '.';
+      sentences.push({
+        id: `sent-other-${idx}`,
+        text: othMsg,
+        sourceVesselIds: ['global'],
+        region: 'global',
+        category: 'other'
+      });
+    });
+  }
+
+  // --- 5. LIMITATIONS CONCISE SENTENCE ---
+  if (limitations && limitations.hasLimitations && limitations.factors && limitations.factors.length > 0) {
+    const limStr = limitations.factors.map((l) => l.replace(/_/g, ' ')).join(', ');
+    sentences.push({
+      id: 'sent-limitations',
+      text: `Assessment was limited by ${limStr}.`,
+      sourceVesselIds: ['global'],
+      region: 'global',
+      category: 'limitation'
+    });
+  }
+
+  // --- 6. COMPARISON CONCISE SENTENCE ---
+  if ((comparisonState?.header?.hasPriorExam || comparisons.length > 0) && comparisons.length > 0) {
+    const keyComp = generateKeyComparisonFinding(state);
+    if (keyComp) {
+      sentences.push({
+        id: 'sent-comparison',
+        text: `Compared to prior study: ${keyComp}`,
+        sourceVesselIds: ['global'],
+        region: 'global',
+        category: 'comparison'
+      });
+    }
+  }
+
+  // --- 7. KEY IMPRESSION LINE ---
+  let keyImpression = '';
+  let impressionVesselIds: string[] = [];
+
+  if (hasDeepDvt) {
+    const abnormalNames = deepAbnormalList.map((f) => `${f.side.toUpperCase()} ${f.vesselName}`).join(', ');
+    keyImpression = `${abnormalNames} DVT.`;
+    impressionVesselIds = deepAbnormalList.map((f) => f.id);
+  } else if (superficialAbnormal.length > 0) {
+    const supNames = superficialAbnormal.map((f) => `${f.side.toUpperCase()} ${f.vesselName}`).join(', ');
+    keyImpression = `${supNames} superficial venous thrombosis. No DVT identified.`;
+    impressionVesselIds = superficialAbnormal.map((f) => f.id);
+  } else {
+    keyImpression = `No DVT identified in the assessed ${sideText} deep veins.`;
+    impressionVesselIds = [];
+  }
+
+  return {
+    summarySentences: sentences,
+    keyImpression,
+    impressionVesselIds,
+    hasPathology
+  };
 }
