@@ -159,5 +159,30 @@ export function runValidationChecks(state: ExamState): ValidationAlert[] {
     });
   }
 
+  // Check 11: Common Femoral Vein Thrombus without Iliocaval Assessment
+  const hasCFVThrombus =
+    state.vesselFindings['right_CFV']?.status === 'abnormal' ||
+    state.vesselFindings['left_CFV']?.status === 'abnormal';
+  const iliocavalAssessed = state.header.scope?.regionsExamined.iliocaval || state.pelvic?.ivcVisualised !== 'not_visualised';
+
+  if (hasCFVThrombus && !iliocavalAssessed) {
+    alerts.push({
+      id: 'alert-cfv-iliocaval-prompt',
+      severity: 'warning',
+      title: 'CFV Thrombus — Iliocaval Extent Unassessed',
+      message: 'Common Femoral Vein thrombus documented without iliocaval venous scope. Consider extending assessment to pelvic/iliocaval veins to evaluate proximal thrombus extent.'
+    });
+  }
+
+  // Check 12: Stale Manual Summary Edit Alert
+  if (state.userSummaryEdited) {
+    alerts.push({
+      id: 'alert-stale-manual-report',
+      severity: 'info',
+      title: 'Manual Report Edits Active',
+      message: 'Report text contains manual sonographer modifications. Verify report consistency if worksheet findings were updated.'
+    });
+  }
+
   return alerts;
 }

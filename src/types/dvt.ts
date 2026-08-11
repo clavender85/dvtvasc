@@ -516,6 +516,17 @@ export interface ValidationAlert {
   vesselId?: string;
 }
 
+export interface ReportBlock {
+  id: string;
+  section: string;
+  title?: string;
+  text: string;
+  sourceVesselIds?: string[];
+  sourceType?: 'vessel' | 'thrombusGroup' | 'doppler' | 'limitation' | 'other_finding' | 'symptom' | 'comparison' | 'communication' | 'variant' | 'normal' | 'manual';
+  region?: 'iliocaval' | 'right_lower_limb' | 'left_lower_limb' | 'global';
+  category?: 'dvt' | 'superficial' | 'doppler' | 'other' | 'normal' | 'limitation' | 'comparison' | 'header';
+}
+
 export interface ExamState {
   header: PatientHeader;
   history: PreviousHistory;

@@ -315,3 +315,8 @@ export function createInitialVesselFindings(): Record<string, VesselFinding> {
 
   return findings;
 }
+
+export const VESSEL_NAME_MAP: Record<string, string> = ANATOMICAL_VESSELS.reduce((acc, vessel) => {
+  acc[vessel.vesselKey] = vessel.shortName || vessel.name;
+  return acc;
+}, {} as Record<string, string>);

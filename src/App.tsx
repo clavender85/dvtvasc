@@ -22,6 +22,7 @@ import { OtherFindingsSection } from './components/OtherFindingsSection';
 import { ComparisonSection } from './components/ComparisonSection';
 import { ReportSummaryView } from './components/ReportSummaryView';
 import { PrintWorksheetView } from './components/PrintWorksheetView';
+import { ReportPreviewPanel } from './components/ReportPreviewPanel';
 import { getNormalizedScope, updateHeaderScope } from './utils/scopeUtils';
 
 import { ProximalExtensionPromptBanner } from './components/ProximalExtensionPromptBanner';
@@ -49,7 +50,7 @@ export const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'worksheet' | 'summary' | 'comparison'>('worksheet');
-  const [worksheetViewMode, setWorksheetViewMode] = useState<'matrix' | 'diagram'>('matrix');
+  const [worksheetViewMode, setWorksheetViewMode] = useState<'matrix' | 'diagram'>('diagram');
   const [selectedVesselId, setSelectedVesselId] = useState<string | null>(null);
   const [selectedVesselIds, setSelectedVesselIds] = useState<string[]>([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
@@ -159,6 +160,7 @@ export const App: React.FC = () => {
         userSummaryEdited: false
       });
       setSelectedVesselId(null);
+      setWorksheetViewMode('diagram');
     }
   };
 
@@ -406,18 +408,19 @@ export const App: React.FC = () => {
             </div>
 
             {/* Primary Worksheet View Selection */}
-            {worksheetViewMode === 'matrix' ? (
-              <VesselMatrixView
-                vesselFindings={examState.vesselFindings}
-                selectedVesselId={selectedVesselId}
-                onSelectVessel={setSelectedVesselId}
-                onUpdateStatus={handleUpdateVesselStatus}
-                onMarkRoutineRightNormal={handleMarkRoutineRightNormal}
-                onMarkRoutineLeftNormal={handleMarkRoutineLeftNormal}
-                onMarkRoutineBilateralNormal={handleMarkRoutineBilateralNormal}
-              />
-            ) : (
-              <div className="space-y-4">
+            <div id="anatomical-map-workspace">
+              {worksheetViewMode === 'matrix' ? (
+                <VesselMatrixView
+                  vesselFindings={examState.vesselFindings}
+                  selectedVesselId={selectedVesselId}
+                  onSelectVessel={setSelectedVesselId}
+                  onUpdateStatus={handleUpdateVesselStatus}
+                  onMarkRoutineRightNormal={handleMarkRoutineRightNormal}
+                  onMarkRoutineLeftNormal={handleMarkRoutineLeftNormal}
+                  onMarkRoutineBilateralNormal={handleMarkRoutineBilateralNormal}
+                />
+              ) : (
+                <div className="space-y-4">
                 {/* 1. Iliocaval Diagram & Pelvic Tree List if Pelvic/Iliocaval region selected */}
                 {iliocaval && (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
@@ -475,6 +478,10 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onToggleReportPreview={() => {
+                              const el = document.getElementById('live-report-preview-panel');
+                              if (el) el.scrollIntoView({ behavior: 'smooth' });
+                            }}
                           />
                         </div>
                         <div className="lg:col-span-3 h-[680px]">
@@ -517,6 +524,10 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onToggleReportPreview={() => {
+                              const el = document.getElementById('live-report-preview-panel');
+                              if (el) el.scrollIntoView({ behavior: 'smooth' });
+                            }}
                           />
                         </div>
                       </>
@@ -537,6 +548,10 @@ export const App: React.FC = () => {
                             onQuickToggleStatus={handleUpdateVesselStatus}
                             onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
+                            onToggleReportPreview={() => {
+                              const el = document.getElementById('live-report-preview-panel');
+                              if (el) el.scrollIntoView({ behavior: 'smooth' });
+                            }}
                           />
                         </div>
                         <div className="lg:col-span-4 h-[680px]">
@@ -556,6 +571,7 @@ export const App: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
 
             {/* Requirement 4: Site of Symptoms */}
             <SymptomSiteSection
@@ -618,6 +634,42 @@ export const App: React.FC = () => {
                 setExamState({ ...examState, clinicalCommunication })
               }
             />
+
+            {/* Requirement: Permanent Live Generated Report Preview Section at the Bottom */}
+            <div id="live-report-preview-panel" className="pt-4 border-t border-slate-800">
+              <ReportPreviewPanel
+                state={examState}
+                selectedVesselId={selectedVesselId}
+                selectedVesselIds={selectedVesselIds}
+                onSelectVessel={(vId) => {
+                  setSelectedVesselId(vId);
+                  setSelectedVesselIds([vId]);
+                  if (worksheetViewMode !== 'diagram') setWorksheetViewMode('diagram');
+                }}
+                onSelectGroup={(vIds) => {
+                  setSelectedVesselIds(vIds);
+                  if (vIds.length > 0) setSelectedVesselId(vIds[0]);
+                  if (worksheetViewMode !== 'diagram') setWorksheetViewMode('diagram');
+                }}
+                onOpenDetailModal={handleOpenDetailModal}
+                onSwitchRegion={(region) => {
+                  if (region === 'iliocaval' && !iliocaval) {
+                    handleAddIliocavalScope();
+                  }
+                  if (worksheetViewMode !== 'diagram') setWorksheetViewMode('diagram');
+                }}
+                onNavigateToReportTab={() => setActiveTab('summary')}
+                onNavigateToComparison={() => setActiveTab('comparison')}
+                isReportManuallyEdited={examState.userSummaryEdited}
+                onRegenerateReport={() =>
+                  setExamState((prev) => ({
+                    ...prev,
+                    userSummaryEdited: false,
+                    summaryText: generateSonographerSummary({ ...prev, userSummaryEdited: false })
+                  }))
+                }
+              />
+            </div>
           </div>
         )}
 
@@ -654,6 +706,11 @@ export const App: React.FC = () => {
             alerts={alerts}
             sonographerSignOff={examState.sonographerSignOff}
             onToggleSignOff={(signed) => setExamState({ ...examState, sonographerSignOff: signed })}
+            onSelectVessel={(vId) => {
+              setSelectedVesselId(vId);
+              setActiveTab('worksheet');
+              setWorksheetViewMode('diagram');
+            }}
           />
         )}
       </main>
