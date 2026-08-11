@@ -294,7 +294,7 @@ export function createInitialVesselFindings(): Record<string, VesselFinding> {
           vesselKey: vDef.vesselKey,
           vesselName: vDef.name,
           category: vDef.category,
-          status: isRoutine ? 'normal' : 'not_assessed',
+          status: 'not_assessed',
           pairedSubtype: vDef.supportsPaired ? 'both' : undefined,
           proximalExtent: {
             distance: null,

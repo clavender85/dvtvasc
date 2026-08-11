@@ -203,7 +203,18 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
     const deepLines: string[] = [`=== ${sideLabel.toUpperCase()} LOWER LIMB ===`];
 
     if (abnormalDeep.length === 0) {
-      if (unvisualisedDeep.length > 0) {
+      if (normalDeep.length === 0 && unvisualisedDeep.length === 0) {
+        deepLines.push(`${sideLabel} lower limb deep venous assessment is pending / not yet documented.`);
+        blocks.push({
+          id: `block-${side}-deep-unassessed`,
+          section: `${sideLabel.toUpperCase()} LOWER LIMB`,
+          text: deepLines.join('\n'),
+          sourceType: 'normal',
+          sourceVesselIds: deepVessels.map((v) => `${side}_${v.vesselKey}`),
+          region: regionKey,
+          category: 'normal'
+        });
+      } else if (unvisualisedDeep.length > 0) {
         const unvisList = unvisualisedDeep.map((v) => {
           const reasonKey = v.nonVisualizationReason || 'body_habitus';
           const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'technical limitation';
@@ -213,21 +224,29 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
         deepLines.push(
           `Deep veins assessed from CFV to calf show normal compressibility and patency. Note: The following vessel(s) could not be adequately visualised: ${unvisList}.`
         );
+        blocks.push({
+          id: `block-${side}-deep-normal`,
+          section: `${sideLabel.toUpperCase()} LOWER LIMB`,
+          text: deepLines.join('\n'),
+          sourceType: 'normal',
+          sourceVesselIds: deepVessels.map((v) => `${side}_${v.vesselKey}`),
+          region: regionKey,
+          category: 'normal'
+        });
       } else {
         deepLines.push(
           `The deep veins demonstrate normal compressibility, patency, and wall features from the common femoral vein through to the distal calf veins. No deep venous thrombosis identified.`
         );
+        blocks.push({
+          id: `block-${side}-deep-normal`,
+          section: `${sideLabel.toUpperCase()} LOWER LIMB`,
+          text: deepLines.join('\n'),
+          sourceType: 'normal',
+          sourceVesselIds: deepVessels.map((v) => `${side}_${v.vesselKey}`),
+          region: regionKey,
+          category: 'normal'
+        });
       }
-
-      blocks.push({
-        id: `block-${side}-deep-normal`,
-        section: `${sideLabel.toUpperCase()} LOWER LIMB`,
-        text: deepLines.join('\n'),
-        sourceType: 'normal',
-        sourceVesselIds: deepVessels.map((v) => `${side}_${v.vesselKey}`),
-        region: regionKey,
-        category: 'normal'
-      });
     } else {
       deepLines.push(`Deep Venous Abnormalities Identified:`);
       

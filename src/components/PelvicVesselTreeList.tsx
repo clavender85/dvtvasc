@@ -2,6 +2,7 @@
 import React from 'react';
 import { VesselFinding, VesselStatus, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
 import { CheckCircle, AlertTriangle, HelpCircle, Edit3, EyeOff, Activity } from 'lucide-react';
+import { RegionStatusHeader } from './RegionStatusHeader';
 
 interface PelvicVesselTreeListProps {
   vesselFindings: Record<string, VesselFinding>;
@@ -9,6 +10,7 @@ interface PelvicVesselTreeListProps {
   selectedVesselIds?: string[];
   onSelectVessel: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
+  onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
 }
 
@@ -56,20 +58,23 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
   selectedVesselIds = [],
   onSelectVessel,
   onUpdateStatus,
+  onBatchUpdateFindings,
   onOpenDetailModal
 }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col h-full">
-      {/* Limb Header */}
-      <div className="bg-slate-950 px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-amber-400" />
-          <span className="font-bold text-xs uppercase tracking-wider text-amber-300">
-            ILIOCAVAL & PELVIC FINDINGS
-          </span>
-        </div>
-        <span className="text-[10px] text-slate-400 uppercase tracking-wide">Vessel Status</span>
-      </div>
+      {/* Interactive Region Status Header */}
+      <RegionStatusHeader
+        region="iliocaval"
+        title="ILIOCAVAL / PELVIC VEINS"
+        themeColor="text-amber-300"
+        vesselFindings={vesselFindings}
+        onBatchUpdateFindings={(updated) => {
+          if (onBatchUpdateFindings) {
+            onBatchUpdateFindings(updated);
+          }
+        }}
+      />
 
       {/* Category Groups Container */}
       <div className="p-2 space-y-3 overflow-y-auto flex-1 max-h-[700px] text-xs">

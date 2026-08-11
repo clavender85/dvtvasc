@@ -4,6 +4,7 @@ import React from 'react';
 import { VesselFinding, VesselCategory, Side, VesselStatus, NON_VISUALIZATION_REASON_LABELS } from '../types/dvt';
 import { ANATOMICAL_VESSELS } from '../data/anatomyData';
 import { CheckCircle, AlertTriangle, HelpCircle, Edit3, ChevronRight, EyeOff } from 'lucide-react';
+import { RegionStatusHeader } from './RegionStatusHeader';
 
 interface VesselTreeListProps {
   side: Side;
@@ -12,6 +13,7 @@ interface VesselTreeListProps {
   includePelvic?: boolean;
   onSelectVessel: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
+  onBatchUpdateFindings?: (updatedFindings: Record<string, VesselFinding>) => void;
   onOpenDetailModal?: (vesselId: string) => void;
 }
 
@@ -31,6 +33,7 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
   includePelvic = false,
   onSelectVessel,
   onUpdateStatus,
+  onBatchUpdateFindings,
   onOpenDetailModal
 }) => {
   const [showPelvicLocal, setShowPelvicLocal] = React.useState<boolean>(includePelvic);
@@ -41,6 +44,7 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
     }
   }, [includePelvic]);
 
+  const regionType = side === 'right' ? 'right_lower_limb' : 'left_lower_limb';
   const sideTitle = side === 'right' ? 'RIGHT LOWER LIMB' : 'LEFT LOWER LIMB';
   const themeColor = side === 'right' ? 'text-teal-400' : 'text-sky-400';
 
@@ -50,12 +54,18 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col h-full">
-      {/* Limb Header */}
-      <div className="bg-slate-950 px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`font-bold text-xs uppercase tracking-wider ${themeColor}`}>{sideTitle}</span>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Interactive Region Status Header */}
+      <RegionStatusHeader
+        region={regionType}
+        title={sideTitle}
+        themeColor={themeColor}
+        vesselFindings={vesselFindings}
+        onBatchUpdateFindings={(updated) => {
+          if (onBatchUpdateFindings) {
+            onBatchUpdateFindings(updated);
+          }
+        }}
+        extraHeaderActions={
           <button
             type="button"
             onClick={() => setShowPelvicLocal(!showPelvicLocal)}
@@ -68,9 +78,8 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
           >
             {showPelvicLocal ? 'Pelvic: ON' : '+ Iliac/IVC'}
           </button>
-          <span className="text-[10px] text-slate-400 uppercase tracking-wide">Vessel Findings</span>
-        </div>
-      </div>
+        }
+      />
 
       {/* Category Groups Container */}
       <div className="p-2 space-y-3 overflow-y-auto flex-1 max-h-[700px] text-xs">

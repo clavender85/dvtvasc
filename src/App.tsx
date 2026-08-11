@@ -6,6 +6,7 @@ import { createInitialVesselFindings, ROUTINE_VESSEL_KEYS } from './data/anatomy
 import { DEMO_CASES, DEMO_CASE_1_NORMAL } from './data/demoCases';
 import { generateSonographerSummary } from './utils/reportGenerator';
 import { runValidationChecks } from './utils/validationEngine';
+import { markRegionRoutineNormal } from './utils/regionStatusUtils';
 
 import { HeaderBar } from './components/HeaderBar';
 import { VesselMatrixView } from './components/VesselMatrixView';
@@ -166,22 +167,7 @@ export const App: React.FC = () => {
 
   // Mark Routine Right Deep Veins Normal
   const handleMarkRoutineRightNormal = () => {
-    const nextFindings = { ...examState.vesselFindings };
-
-    Object.keys(nextFindings).forEach((vId) => {
-      const f = nextFindings[vId];
-      if (f.side === 'right' && ROUTINE_VESSEL_KEYS.includes(f.vesselKey)) {
-        if (f.status !== 'abnormal') {
-          nextFindings[vId] = {
-            ...f,
-            status: 'normal',
-            compressibility: 'fully_compressible',
-            patency: 'patent'
-          };
-        }
-      }
-    });
-
+    const nextFindings = markRegionRoutineNormal('right_lower_limb', examState.vesselFindings);
     setExamState((prev) => ({
       ...prev,
       vesselFindings: nextFindings,
@@ -191,22 +177,7 @@ export const App: React.FC = () => {
 
   // Mark Routine Left Deep Veins Normal
   const handleMarkRoutineLeftNormal = () => {
-    const nextFindings = { ...examState.vesselFindings };
-
-    Object.keys(nextFindings).forEach((vId) => {
-      const f = nextFindings[vId];
-      if (f.side === 'left' && ROUTINE_VESSEL_KEYS.includes(f.vesselKey)) {
-        if (f.status !== 'abnormal') {
-          nextFindings[vId] = {
-            ...f,
-            status: 'normal',
-            compressibility: 'fully_compressible',
-            patency: 'patent'
-          };
-        }
-      }
-    });
-
+    const nextFindings = markRegionRoutineNormal('left_lower_limb', examState.vesselFindings);
     setExamState((prev) => ({
       ...prev,
       vesselFindings: nextFindings,
@@ -216,22 +187,8 @@ export const App: React.FC = () => {
 
   // Mark Routine Bilateral Deep Veins Normal
   const handleMarkRoutineBilateralNormal = () => {
-    const nextFindings = { ...examState.vesselFindings };
-
-    Object.keys(nextFindings).forEach((vId) => {
-      const f = nextFindings[vId];
-      if ((f.side === 'right' || f.side === 'left') && ROUTINE_VESSEL_KEYS.includes(f.vesselKey)) {
-        if (f.status !== 'abnormal') {
-          nextFindings[vId] = {
-            ...f,
-            status: 'normal',
-            compressibility: 'fully_compressible',
-            patency: 'patent'
-          };
-        }
-      }
-    });
-
+    let nextFindings = markRegionRoutineNormal('right_lower_limb', examState.vesselFindings);
+    nextFindings = markRegionRoutineNormal('left_lower_limb', nextFindings);
     setExamState((prev) => ({
       ...prev,
       vesselFindings: nextFindings,
@@ -431,6 +388,7 @@ export const App: React.FC = () => {
                         selectedVesselIds={selectedVesselIds}
                         onSelectVessel={setSelectedVesselId}
                         onUpdateStatus={handleUpdateVesselStatus}
+                        onBatchUpdateFindings={handleBatchUpdateVessels}
                         onOpenDetailModal={handleOpenDetailModal}
                       />
                     </div>
@@ -463,6 +421,7 @@ export const App: React.FC = () => {
                             selectedVesselId={selectedVesselId}
                             onSelectVessel={setSelectedVesselId}
                             onUpdateStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
                           />
                         </div>
@@ -492,6 +451,7 @@ export const App: React.FC = () => {
                             selectedVesselId={selectedVesselId}
                             onSelectVessel={setSelectedVesselId}
                             onUpdateStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
                           />
                         </div>
@@ -509,6 +469,7 @@ export const App: React.FC = () => {
                             selectedVesselId={selectedVesselId}
                             onSelectVessel={setSelectedVesselId}
                             onUpdateStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
                           />
                         </div>
@@ -562,6 +523,7 @@ export const App: React.FC = () => {
                             selectedVesselId={selectedVesselId}
                             onSelectVessel={setSelectedVesselId}
                             onUpdateStatus={handleUpdateVesselStatus}
+                            onBatchUpdateFindings={handleBatchUpdateVessels}
                             onOpenDetailModal={handleOpenDetailModal}
                           />
                         </div>

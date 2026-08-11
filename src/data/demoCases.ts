@@ -68,7 +68,24 @@ export const DEMO_CASE_1_NORMAL: ExamState = {
     examType: 'Bilateral lower limbs',
     indications: ['Leg swelling', 'Elevated D-dimer'],
     clinicalHistory: 'Bilateral mild pedal oedema following long haul flight. Elevated D-dimer 0.65 mg/L.'
-  }
+  },
+  vesselFindings: (() => {
+    const vf = createInitialVesselFindings();
+    Object.keys(vf).forEach((key) => {
+      if (key.startsWith('right_') || key.startsWith('left_')) {
+        const vKey = vf[key].vesselKey;
+        if (['CFV', 'PFV', 'FV_PROX', 'FV_MID', 'FV_DIST', 'POPV', 'TPTV', 'PTV', 'PERV', 'MGV', 'LGV', 'SV'].includes(vKey)) {
+          vf[key] = {
+            ...vf[key],
+            status: 'normal',
+            compressibility: 'fully_compressible',
+            patency: 'patent'
+          };
+        }
+      }
+    });
+    return vf;
+  })()
 };
 
 // Demo 2: Acute-appearing occlusive left popliteal DVT extending into PTV and PerV
