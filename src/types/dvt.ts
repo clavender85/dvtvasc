@@ -258,6 +258,19 @@ export interface ClinicalCommunication {
   patientDisposition?: string;
 }
 
+export type SSVVariantOption =
+  | 'spj_present'
+  | 'cranial_extension_only'
+  | 'spj_and_cranial_extension'
+  | 'no_definite_spj'
+  | 'other';
+
+export interface SSVVariantState {
+  variant: SSVVariantOption;
+  giacominiDocumented?: boolean;
+  customDetails?: string;
+}
+
 export type VariantType =
   | 'Duplicated femoral vein'
   | 'Duplicated popliteal vein'
@@ -574,6 +587,10 @@ export interface ExamState {
   clinicalCommunication?: ClinicalCommunication;
   otherFindings: OtherFindingItem[];
   anatomicalVariants?: AnatomicalVariantItem[];
+  ssvVariants?: {
+    right?: SSVVariantState;
+    left?: SSVVariantState;
+  };
   comparisons: VesselComparison[];
   comparisonState?: ComparisonState;
   generatedSummary: string;

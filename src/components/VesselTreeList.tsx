@@ -13,8 +13,10 @@ import {
   AugmentationOption
 } from '../types/dvt';
 import { ANATOMICAL_VESSELS } from '../data/anatomyData';
-import { CheckCircle, AlertTriangle, HelpCircle, Edit3, ChevronRight, EyeOff } from 'lucide-react';
+import { CheckCircle, AlertTriangle, HelpCircle, Edit3, ChevronRight, EyeOff, GitBranch } from 'lucide-react';
 import { RegionStatusHeader } from './RegionStatusHeader';
+import { SSVVariantWidget } from './SSVVariantWidget';
+import { SSVVariantState } from '../types/dvt';
 
 interface VesselTreeListProps {
   side: Side;
@@ -25,6 +27,8 @@ interface VesselTreeListProps {
   doppler?: DopplerAssessment;
   contralateralCFVAssessment?: ContralateralCFVAssessment;
   isUnilateralStudy?: boolean;
+  ssvVariant?: SSVVariantState;
+  onChangeSSVVariant?: (variantState: SSVVariantState) => void;
   onSelectVessel: (vesselId: string) => void;
   onToggleSelectVessel?: (vesselId: string) => void;
   onUpdateStatus: (vesselId: string, status: VesselStatus) => void;
@@ -57,6 +61,8 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
   doppler,
   contralateralCFVAssessment,
   isUnilateralStudy = false,
+  ssvVariant,
+  onChangeSSVVariant,
   onSelectVessel,
   onToggleSelectVessel,
   onUpdateStatus,
@@ -126,6 +132,18 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
                 </span>
               </div>
 
+              {/* SSV Variant Control if in Superficial category */}
+              {category === 'superficial' && onChangeSSVVariant && (
+                <div className="p-2 border-b border-slate-800 bg-slate-900/40">
+                  <SSVVariantWidget
+                    side={side as 'right' | 'left'}
+                    variantState={ssvVariant}
+                    onChange={onChangeSSVVariant}
+                    compact={true}
+                  />
+                </div>
+              )}
+
               {/* Vessels List */}
               <div className="divide-y divide-slate-800/60">
                 {vesselsInCategory.map((vDef) => {
@@ -138,6 +156,8 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
 
                   if (!finding) return null;
 
+                  const isSubTreeItem = vDef.vesselKey === 'SSV_SPJ' || vDef.vesselKey === 'SSV_CRANIAL';
+
                   const displayName =
                     vDef.category === 'pelvis'
                       ? vDef.vesselKey === 'IVC'
@@ -149,6 +169,8 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
                     <div
                       key={vesselId}
                       className={`p-2 transition-colors flex flex-col gap-1 cursor-pointer ${
+                        isSubTreeItem ? 'pl-5 bg-slate-950/40 border-l-2 border-slate-800/80' : ''
+                      } ${
                         isSelected
                           ? 'bg-slate-800/90 border-l-4 border-teal-500'
                           : finding.status === 'abnormal'

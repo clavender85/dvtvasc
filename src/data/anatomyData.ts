@@ -174,11 +174,27 @@ export const ANATOMICAL_VESSELS: VesselDefinition[] = [
   },
   {
     vesselKey: 'SSV',
-    name: 'Small Saphenous Vein (SSV / SPJ)',
-    shortName: 'SSV / SPJ',
+    name: 'Small Saphenous Vein (SSV / Main)',
+    shortName: 'SSV (Main)',
     category: 'superficial',
     isSuperficial: true,
     defaultLandmarks: { proximal: 'SPJ', distal: 'mid_calf' }
+  },
+  {
+    vesselKey: 'SSV_SPJ',
+    name: 'Saphenopopliteal Junction (SPJ)',
+    shortName: 'SPJ Junction',
+    category: 'superficial',
+    isSuperficial: true,
+    defaultLandmarks: { proximal: 'knee_crease', distal: 'SPJ' }
+  },
+  {
+    vesselKey: 'SSV_CRANIAL',
+    name: 'Ascending / Cranial SSV Extension',
+    shortName: 'Cranial SSV Ext',
+    category: 'superficial',
+    isSuperficial: true,
+    defaultLandmarks: { proximal: 'adductor_canal', distal: 'knee_crease' }
   },
   {
     vesselKey: 'SUPERFICIAL_VARIX',
@@ -270,6 +286,8 @@ export const OPTIONAL_VESSEL_KEYS = [
   'GSV_PROX',
   'GSV_CALF',
   'SSV',
+  'SSV_SPJ',
+  'SSV_CRANIAL',
   'SUPERFICIAL_VARIX'
 ];
 

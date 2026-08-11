@@ -11,7 +11,8 @@ import {
   Patency,
   SonographicChronicity,
   ThrombusEchogenicity,
-  NON_VISUALIZATION_REASON_LABELS
+  NON_VISUALIZATION_REASON_LABELS,
+  SSVVariantState
 } from '../types/dvt';
 import { LANDMARK_LABELS } from '../data/anatomyData';
 import {
@@ -43,6 +44,10 @@ interface AnatomicalDiagramProps {
   vesselFindings: Record<string, VesselFinding>;
   selectedVesselId: string | null;
   selectedVesselIds?: string[];
+  ssvVariants?: {
+    right?: SSVVariantState;
+    left?: SSVVariantState;
+  };
   onToggleSelectVessel?: (vesselId: string) => void;
   onClearSelection?: () => void;
   onSelectGroup?: (vesselIds: string[]) => void;
@@ -170,10 +175,13 @@ const LANDMARK_Y = {
   ANKLE: 920
 };
 
+export type MapViewMode = 'all' | 'normal' | 'abnormal_context' | 'abnormal_only' | 'selected';
+
 export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   vesselFindings,
   selectedVesselId,
   selectedVesselIds: propsSelectedVesselIds,
+  ssvVariants,
   onToggleSelectVessel,
   onClearSelection,
   onSelectGroup,
@@ -189,7 +197,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showLandmarks, setShowLandmarks] = useState<boolean>(true);
   const [showTextLabels, setShowTextLabels] = useState<boolean>(false);
-  const [filterMode, setFilterMode] = useState<'all' | 'abnormal_only' | 'routine'>('all');
+  const [mapViewMode, setMapViewMode] = useState<MapViewMode>('all');
 
   // Double Click / Double Tap Tracker
   const lastClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
@@ -516,7 +524,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         lumenColor: isSuperficial ? '#38bdf8' : '#34d399',
         lumenWidth: Math.max(3, calculatedWidth - 4),
         statusText: 'Normal Patent',
-        opacity: filterMode === 'abnormal_only' ? 0.3 : 0.95
+        opacity: mapViewMode === 'abnormal_only' ? 0.3 : 0.95
       };
     }
 
@@ -619,35 +627,46 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
     const isHovered = hoveredId === id;
     const visualSpecs = getVesselVisuals(id, category);
 
-    if (filterMode === 'abnormal_only' && finding?.status !== 'abnormal') {
+    if (mapViewMode === 'normal' && finding?.status !== 'normal') {
       return null;
+    }
+    if (mapViewMode === 'abnormal_only' && finding?.status !== 'abnormal') {
+      return null;
+    }
+    if (mapViewMode === 'selected' && !isSelected) {
+      return null;
+    }
+
+    let segmentOpacity = visualSpecs.opacity;
+    if (mapViewMode === 'abnormal_context') {
+      segmentOpacity = finding?.status === 'abnormal' ? 1.0 : 0.15;
     }
 
     const renderPathStack = (d: string, keySuffix: string = '') => (
       <g key={`${id}_paths${keySuffix}`}>
-        {/* Glow halo when selected or hovered */}
+        {/* Subtle Cyan Selection / Hover Outer Halo */}
         {(isSelected || isHovered) && (
           <path
             d={d}
             stroke={isSelected ? '#38bdf8' : '#60a5fa'}
-            strokeWidth={visualSpecs.wallWidth + 8}
+            strokeWidth={visualSpecs.wallWidth + 6}
             strokeLinecap="round"
+            strokeLinejoin="round"
             fill="none"
-            opacity={isSelected ? 0.65 : 0.4}
-            className="animate-pulse"
+            opacity={isSelected ? 0.75 : 0.45}
           />
         )}
 
-        {/* Layer 1: Outer Wall */}
+        {/* Layer 1: Outer Wall (Preserves Pathology Wall Color) */}
         <path
           d={d}
-          stroke={isSelected ? '#38bdf8' : visualSpecs.wallColor}
+          stroke={visualSpecs.wallColor}
           strokeWidth={visualSpecs.wallWidth}
           strokeDasharray={visualSpecs.wallDashArray}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
-          opacity={visualSpecs.opacity}
+          opacity={segmentOpacity}
         />
 
         {/* Layer 2: Fill / Thrombus Pattern Layer */}
@@ -659,7 +678,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
-            opacity={visualSpecs.opacity}
+            opacity={segmentOpacity}
           />
         )}
 
@@ -800,27 +819,6 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           </g>
         )}
 
-        {/* Multi-Selection Checkmark Badge on SVG */}
-        {isSelected && labelPos && !visualSpecs.showQuestionMark && (
-          <g transform={`translate(${labelPos.x}, ${labelPos.y - 14})`}>
-            <circle
-              r="7"
-              fill="#0284c7"
-              stroke="#38bdf8"
-              strokeWidth="1.5"
-              className="animate-bounce"
-            />
-            <path
-              d="M-3,-0.5 L-1,1.5 L3,-2"
-              stroke="#ffffff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </g>
-        )}
-
         {/* Landmark Text Tag for Extents */}
         {finding?.status === 'abnormal' && labelPos && (showTextLabels || isHovered) && (
           <g transform={`translate(${labelPos.x}, ${labelPos.y})`}>
@@ -889,7 +887,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-white shadow-xl flex flex-col h-full relative">
       {/* Top Map Toolbar & Multi-Select Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-slate-800 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-slate-800 text-xs min-h-[36px]">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-teal-400" />
           <span className="font-bold text-slate-100 tracking-wide uppercase text-xs">
@@ -978,13 +976,13 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           <button
             type="button"
             onClick={() =>
-              setFilterMode((prev) =>
-                prev === 'all' ? 'abnormal_only' : prev === 'abnormal_only' ? 'routine' : 'all'
+              setMapViewMode((prev) =>
+                prev === 'all' ? 'abnormal_only' : prev === 'abnormal_only' ? 'selected' : 'all'
               )
             }
             className="px-2.5 py-1 rounded text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
           >
-            Filter: {filterMode === 'all' ? 'All' : filterMode === 'abnormal_only' ? 'Abnormal' : 'Routine'}
+            Filter: {mapViewMode === 'all' ? 'All' : mapViewMode === 'abnormal_only' ? 'Abnormal Only' : 'Selected Only'}
           </button>
 
           <div className="flex items-center bg-slate-950 rounded border border-slate-800 p-0.5">
@@ -1106,7 +1104,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       </div>
 
       {/* Multi-Vessel Batch Property Editor Drawer / Card */}
-      {(showBatchDrawer || (selectedVesselIds.length > 1 && !showBatchDrawer)) && (
+      {showBatchDrawer && (
         <div className="mb-3 p-3.5 bg-slate-950 border border-sky-500/50 rounded-xl shadow-2xl text-xs space-y-3 animate-fadeIn">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -1343,6 +1341,41 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
           <div className="absolute top-3 right-1/4 translate-x-1/2 bg-sky-950/80 border border-sky-800 text-sky-300 px-3 py-1 rounded-full text-xs font-bold shadow-md">
             LEFT LOWER LIMB
           </div>
+
+          {/* Passive Floating Hover Overlay Tooltip (Does NOT occupy document flow space) */}
+          {hoveredFinding && (
+            <div className="absolute bottom-3 right-4 bg-slate-950/95 border border-slate-700/80 p-2 rounded-lg shadow-2xl backdrop-blur-md max-w-xs pointer-events-none z-20 text-xs">
+              <div className="flex items-center gap-2 font-bold text-[11px] text-slate-100">
+                <span className="text-teal-300">{hoveredFinding.vesselName}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    hoveredFinding.status === 'abnormal'
+                      ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                      : hoveredFinding.status === 'normal'
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      : hoveredFinding.status === 'not_visualised'
+                      ? 'bg-slate-900 text-slate-300 border border-slate-700'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {hoveredFinding.status === 'not_visualised'
+                    ? 'NV'
+                    : hoveredFinding.status === 'not_assessed'
+                    ? 'NA'
+                    : hoveredFinding.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {hoveredFinding.status === 'abnormal' ? (
+                <p className="text-[10px] text-amber-300 mt-0.5">
+                  {hoveredFinding.patency?.replace(/_/g, ' ') || 'thrombus present'}
+                  {hoveredFinding.chronicity ? ` (${hoveredFinding.chronicity.replace(/_/g, ' ')})` : ''}
+                </p>
+              ) : hoveredFinding.status === 'normal' ? (
+                <p className="text-[10px] text-emerald-400 mt-0.5">Normal / Patent</p>
+              ) : null}
+              <p className="text-[9px] text-slate-400 mt-0.5 italic">Click: Select • Double-Click: Edit</p>
+            </div>
+          )}
 
           {/* SVG Map Canvas */}
           <div
@@ -1627,8 +1660,6 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               { x: 275, y: 270, textAnchor: 'end' }
             )}
 
-            <circle cx="290" cy={LANDMARK_Y.SFJ} r="5" fill="#0284c7" stroke="#38bdf8" strokeWidth="1.5" />
-
             {renderVesselSegment(
               'right_GSV_PROX',
               'Right Prox GSV',
@@ -1689,17 +1720,49 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               { x: 275, y: 575, textAnchor: 'end' }
             )}
 
-            <circle cx="290" cy={LANDMARK_Y.SPJ} r="4.5" fill="#0284c7" stroke="#38bdf8" strokeWidth="1.5" />
+            {/* Right SSV Anatomical Rendering based on SSV Variant */}
+            {(() => {
+              const rVar = ssvVariants?.right?.variant || 'spj_present';
+              const showSpj = rVar === 'spj_present' || rVar === 'spj_and_cranial_extension' || vesselFindings['right_SSV_SPJ']?.status === 'abnormal';
+              const showCranial = rVar === 'cranial_extension_only' || rVar === 'spj_and_cranial_extension' || vesselFindings['right_SSV_CRANIAL']?.status === 'abnormal';
 
-            {renderVesselSegment(
-              'right_SSV',
-              'Right SSV (SPJ)',
-              'superficial',
-              `M290,${LANDMARK_Y.SPJ} C260,640 260,760 270,860`,
-              false,
-              undefined,
-              { x: 250, y: 720, textAnchor: 'end' }
-            )}
+              return (
+                <g key="right_ssv_group">
+                  {/* Right SSV Main Calf */}
+                  {renderVesselSegment(
+                    'right_SSV',
+                    'Right SSV (Calf)',
+                    'superficial',
+                    `M270,620 C260,680 260,760 270,860`,
+                    false,
+                    undefined,
+                    { x: 250, y: 720, textAnchor: 'end' }
+                  )}
+
+                  {/* Right SSV SPJ Junction Branch */}
+                  {showSpj && renderVesselSegment(
+                    'right_SSV_SPJ',
+                    'Right SSV (SPJ Junction)',
+                    'superficial',
+                    `M270,620 L290,${LANDMARK_Y.SPJ}`,
+                    false,
+                    undefined,
+                    { x: 275, y: 610, textAnchor: 'end' }
+                  )}
+
+                  {/* Right SSV Cranial Thigh Extension */}
+                  {showCranial && renderVesselSegment(
+                    'right_SSV_CRANIAL',
+                    'Right Cranial SSV Extension',
+                    'superficial',
+                    `M270,620 C265,560 265,500 270,450`,
+                    false,
+                    undefined,
+                    { x: 255, y: 510, textAnchor: 'end' }
+                  )}
+                </g>
+              );
+            })()}
 
             {renderVesselSegment(
               'right_TPTV',
@@ -1792,8 +1855,6 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               { x: 625, y: 270, textAnchor: 'start' }
             )}
 
-            <circle cx="610" cy={LANDMARK_Y.SFJ} r="5" fill="#0284c7" stroke="#38bdf8" strokeWidth="1.5" />
-
             {renderVesselSegment(
               'left_GSV_PROX',
               'Left Prox GSV',
@@ -1854,17 +1915,49 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               { x: 625, y: 575, textAnchor: 'start' }
             )}
 
-            <circle cx="610" cy={LANDMARK_Y.SPJ} r="4.5" fill="#0284c7" stroke="#38bdf8" strokeWidth="1.5" />
+            {/* Left SSV Anatomical Rendering based on SSV Variant */}
+            {(() => {
+              const lVar = ssvVariants?.left?.variant || 'spj_present';
+              const showSpj = lVar === 'spj_present' || lVar === 'spj_and_cranial_extension' || vesselFindings['left_SSV_SPJ']?.status === 'abnormal';
+              const showCranial = lVar === 'cranial_extension_only' || lVar === 'spj_and_cranial_extension' || vesselFindings['left_SSV_CRANIAL']?.status === 'abnormal';
 
-            {renderVesselSegment(
-              'left_SSV',
-              'Left SSV (SPJ)',
-              'superficial',
-              `M610,${LANDMARK_Y.SPJ} C640,640 640,760 630,860`,
-              false,
-              undefined,
-              { x: 650, y: 720, textAnchor: 'start' }
-            )}
+              return (
+                <g key="left_ssv_group">
+                  {/* Left SSV Main Calf */}
+                  {renderVesselSegment(
+                    'left_SSV',
+                    'Left SSV (Calf)',
+                    'superficial',
+                    `M630,620 C640,680 640,760 630,860`,
+                    false,
+                    undefined,
+                    { x: 650, y: 720, textAnchor: 'start' }
+                  )}
+
+                  {/* Left SSV SPJ Junction Branch */}
+                  {showSpj && renderVesselSegment(
+                    'left_SSV_SPJ',
+                    'Left SSV (SPJ Junction)',
+                    'superficial',
+                    `M630,620 L610,${LANDMARK_Y.SPJ}`,
+                    false,
+                    undefined,
+                    { x: 625, y: 610, textAnchor: 'start' }
+                  )}
+
+                  {/* Left SSV Cranial Thigh Extension */}
+                  {showCranial && renderVesselSegment(
+                    'left_SSV_CRANIAL',
+                    'Left Cranial SSV Extension',
+                    'superficial',
+                    `M630,620 C635,560 635,500 630,450`,
+                    false,
+                    undefined,
+                    { x: 645, y: 510, textAnchor: 'start' }
+                  )}
+                </g>
+              );
+            })()}
 
             {renderVesselSegment(
               'left_TPTV',
@@ -2017,117 +2110,6 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
         </div>
       </div>
     </div>
-
-      {/* Hover Inspection Popover Panel */}
-      {hoveredFinding && (
-        <div className="mt-3 p-3 bg-slate-950/95 border border-teal-500/60 rounded-xl shadow-2xl text-xs text-slate-100 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-teal-300">
-                {hoveredFinding.vesselName}
-              </span>
-              <span
-                className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
-                  hoveredFinding.status === 'abnormal'
-                    ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                    : hoveredFinding.status === 'normal'
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                    : hoveredFinding.status === 'not_visualised'
-                    ? 'bg-slate-900 text-slate-300 border border-slate-700'
-                    : 'bg-slate-800 text-slate-400'
-                }`}
-              >
-                {hoveredFinding.status === 'not_visualised'
-                  ? 'Not Visualised (NV)'
-                  : hoveredFinding.status === 'not_assessed'
-                  ? 'Not Examined (NA)'
-                  : hoveredFinding.status.replace(/_/g, ' ')}
-              </span>
-              {hoveredFinding.category && (
-                <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
-                  {hoveredFinding.category.replace(/_/g, ' ')}
-                </span>
-              )}
-            </div>
-
-            {/* Detailed Clinical Finding Parameters */}
-            {hoveredFinding.status === 'abnormal' ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-300">
-                <span>
-                  <strong className="text-slate-400">Patency:</strong>{' '}
-                  <span className="text-rose-300 font-semibold">
-                    {hoveredFinding.patency?.replace(/_/g, ' ') || 'thrombus present'}
-                  </span>
-                </span>
-                <span>
-                  <strong className="text-slate-400">Compressibility:</strong>{' '}
-                  {hoveredFinding.compressibility?.replace(/_/g, ' ') || 'non-compressible'}
-                </span>
-                {hoveredFinding.chronicity && (
-                  <span>
-                    <strong className="text-slate-400">Chronicity:</strong>{' '}
-                    <span className="text-purple-300">
-                      {hoveredFinding.chronicity.replace(/_/g, ' ')}
-                    </span>
-                  </span>
-                )}
-                {hoveredFinding.echogenicity && (
-                  <span>
-                    <strong className="text-slate-400">Echogenicity:</strong>{' '}
-                    {hoveredFinding.echogenicity.replace(/_/g, ' ')}
-                  </span>
-                )}
-              </div>
-            ) : hoveredFinding.status === 'not_visualised' ? (
-              <p className="text-[11px] text-amber-300 font-medium">
-                Attempted, Not Visualised — Reason: {NON_VISUALIZATION_REASON_LABELS[hoveredFinding.nonVisualizationReason || 'body_habitus']}
-                {hoveredFinding.customNonVisualizationReason ? ` (${hoveredFinding.customNonVisualizationReason})` : ''}
-              </p>
-            ) : hoveredFinding.status === 'not_assessed' ? (
-              <p className="text-[11px] text-slate-400 italic">
-                Not Examined / Out of current study protocol scope.
-              </p>
-            ) : (
-              <p className="text-[11px] text-slate-400">
-                Fully compressible with normal color Doppler lumen filling and phasic flow response.
-              </p>
-            )}
-
-            {/* Extents */}
-            {hoveredFinding.status === 'abnormal' && (
-              <div className="text-[11px] text-amber-300/90 font-mono flex items-center gap-2">
-                {(() => {
-                  const { proxText, distText } = formatExtentLabel(hoveredFinding);
-                  return (
-                    <>
-                      {proxText && <span>• Proximal: {proxText}</span>}
-                      {distText && <span>• Distal: {distText}</span>}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Location details or Comments if available */}
-            {hoveredFinding.locationDetails && (
-              <div className="text-[11px] text-sky-300 bg-sky-950/60 border border-sky-800/80 px-2 py-0.5 rounded inline-block">
-                <strong>Location:</strong> {hoveredFinding.locationDetails}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => onSelectVessel(hoveredFinding.id)}
-              className="bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition-all active:scale-95"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Edit Details
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  </div>
+);
 };

@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
-import { AnatomicalVariantItem, VariantType, VesselStatus } from '../types/dvt';
+import { AnatomicalVariantItem, SSVVariantState, VariantType, VesselStatus } from '../types/dvt';
 import { GitFork, Plus, Trash2 } from 'lucide-react';
+import { SSVVariantWidget } from './SSVVariantWidget';
 
 interface AnatomicalVariantsSectionProps {
   variants: AnatomicalVariantItem[];
   onChangeVariants: (updated: AnatomicalVariantItem[]) => void;
+  ssvVariants?: {
+    right?: SSVVariantState;
+    left?: SSVVariantState;
+  };
+  onChangeSSVVariants?: (updated: { right?: SSVVariantState; left?: SSVVariantState }) => void;
 }
 
 const VARIANT_TYPE_OPTIONS: VariantType[] = [
@@ -15,11 +21,18 @@ const VARIANT_TYPE_OPTIONS: VariantType[] = [
   'Other'
 ];
 
-export const AnatomicalVariantsSection: React.FC<AnatomicalVariantsSectionProps> = ({
-  variants,
-  onChangeVariants
-}) => {
-  const [isOpen, setIsOpen] = useState(variants.length > 0);
+export const AnatomicalVariantsSection: React.FC<AnatomicalVariantsSectionProps> = (props) => {
+  const {
+    variants,
+    onChangeVariants,
+    ssvVariants = {},
+    onChangeSSVVariants
+  } = props;
+  const [isOpen, setIsOpen] = useState(
+    variants.length > 0 ||
+      (ssvVariants?.right && ssvVariants.right.variant !== 'spj_present') ||
+      (ssvVariants?.left && ssvVariants.left.variant !== 'spj_present')
+  );
 
   const addVariant = () => {
     const newItem: AnatomicalVariantItem = {
@@ -69,7 +82,33 @@ export const AnatomicalVariantsSection: React.FC<AnatomicalVariantsSectionProps>
       </button>
 
       {isOpen && (
-        <div className="p-4 space-y-3 text-xs bg-slate-900/60">
+        <div className="p-4 space-y-4 text-xs bg-slate-900/60">
+          {/* SSV Anatomical Variants Section */}
+          {onChangeSSVVariants && (
+            <div className="space-y-3 pb-3 border-b border-slate-800">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                <GitFork className="w-3.5 h-3.5" />
+                SSV Termination & Cranial Extension Variants:
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <SSVVariantWidget
+                  side="right"
+                  variantState={ssvVariants?.right}
+                  onChange={(updated) =>
+                    onChangeSSVVariants({ ...ssvVariants, right: updated })
+                  }
+                />
+                <SSVVariantWidget
+                  side="left"
+                  variantState={ssvVariants?.left}
+                  onChange={(updated) =>
+                    onChangeSSVVariants({ ...ssvVariants, left: updated })
+                  }
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between items-center">
             <span className="text-slate-400 text-[11px]">
               Document duplicated channels or anatomical variations. Each duplicated channel is assessed independently.
