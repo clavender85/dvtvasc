@@ -205,7 +205,7 @@ export interface ContralateralCFVAssessment {
   comments?: string;
 }
 
-export type SymptomSide = 'Right' | 'Left' | 'Bilateral' | 'Central';
+export type SymptomSide = 'Not specified' | 'Right' | 'Left' | 'Bilateral' | 'Central';
 export type SymptomRegion =
   | 'Groin'
   | 'Thigh'

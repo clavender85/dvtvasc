@@ -113,7 +113,7 @@ export const VesselTreeList: React.FC<VesselTreeListProps> = ({
       />
 
       {/* Category Groups Container */}
-      <div className="p-2 space-y-3 overflow-y-auto flex-1 max-h-[700px] text-xs">
+      <div className="p-2 space-y-3 flex-1 text-xs">
         {activeCategoryOrder.map((category) => {
           const vesselsInCategory = ANATOMICAL_VESSELS.filter((v) => v.category === category);
 

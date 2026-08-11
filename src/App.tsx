@@ -336,6 +336,8 @@ export const App: React.FC = () => {
       <HeaderBar
         header={examState.header}
         onChangeHeader={(header) => setExamState({ ...examState, header })}
+        symptomSite={examState.symptomSite}
+        onChangeSymptomSite={(symptomSite) => setExamState((prev) => ({ ...prev, symptomSite }))}
         onSelectDemoCase={handleSelectDemoCase}
         onMarkAssessedNormal={() => setIsNormalModalOpen(true)}
         onSaveDraft={handleSaveDraft}
@@ -449,8 +451,8 @@ export const App: React.FC = () => {
                 <div className="space-y-4">
                 {/* 1. Iliocaval Diagram & Pelvic Tree List if Pelvic/Iliocaval region selected */}
                 {iliocaval && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                    <div className="lg:col-span-4 h-[680px]">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                    <div className="lg:col-span-4 flex flex-col">
                       <PelvicVesselTreeList
                         vesselFindings={examState.vesselFindings}
                         selectedVesselId={selectedVesselId}
@@ -463,7 +465,7 @@ export const App: React.FC = () => {
                         onContextMenu={handleContextMenu}
                       />
                     </div>
-                    <div className="lg:col-span-8 h-[680px]">
+                    <div className="lg:col-span-8 flex flex-col">
                       <IliocavalDiagram
                         vesselFindings={examState.vesselFindings}
                         selectedVesselId={selectedVesselId}
@@ -481,11 +483,11 @@ export const App: React.FC = () => {
 
                 {/* 2. Lower Limb Diagrams & Trees based on selected limbs */}
                 {(rightLowerLimb || leftLowerLimb) && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Both Limbs Examined */}
                     {rightLowerLimb && leftLowerLimb && (
                       <>
-                        <div className="lg:col-span-3 h-[680px]">
+                        <div className="lg:col-span-3 flex flex-col">
                           <VesselTreeList
                             side="right"
                             includePelvic={iliocaval}
@@ -503,7 +505,7 @@ export const App: React.FC = () => {
                             onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
-                        <div className="lg:col-span-6 h-[680px]">
+                        <div className="lg:col-span-6 flex flex-col">
                           <AnatomicalDiagram
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
@@ -522,7 +524,7 @@ export const App: React.FC = () => {
                             }}
                           />
                         </div>
-                        <div className="lg:col-span-3 h-[680px]">
+                        <div className="lg:col-span-3 flex flex-col">
                           <VesselTreeList
                             side="left"
                             includePelvic={iliocaval}
@@ -546,7 +548,7 @@ export const App: React.FC = () => {
                     {/* Right Limb ONLY */}
                     {rightLowerLimb && !leftLowerLimb && (
                       <>
-                        <div className="lg:col-span-4 h-[680px]">
+                        <div className="lg:col-span-4 flex flex-col">
                           <VesselTreeList
                             side="right"
                             includePelvic={iliocaval}
@@ -564,7 +566,7 @@ export const App: React.FC = () => {
                             onUpdateVesselDoppler={handleUpdateVesselDoppler}
                           />
                         </div>
-                        <div className="lg:col-span-8 h-[680px]">
+                        <div className="lg:col-span-8 flex flex-col">
                           <AnatomicalDiagram
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
@@ -589,7 +591,7 @@ export const App: React.FC = () => {
                     {/* Left Limb ONLY */}
                     {!rightLowerLimb && leftLowerLimb && (
                       <>
-                        <div className="lg:col-span-8 h-[680px]">
+                        <div className="lg:col-span-8 flex flex-col">
                           <AnatomicalDiagram
                             vesselFindings={examState.vesselFindings}
                             selectedVesselId={selectedVesselId}
@@ -608,7 +610,7 @@ export const App: React.FC = () => {
                             }}
                           />
                         </div>
-                        <div className="lg:col-span-4 h-[680px]">
+                        <div className="lg:col-span-4 flex flex-col">
                           <VesselTreeList
                             side="left"
                             includePelvic={iliocaval}
@@ -633,12 +635,6 @@ export const App: React.FC = () => {
               </div>
             )}
           </div>
-
-            {/* Requirement 4: Site of Symptoms */}
-            <SymptomSiteSection
-              symptomSite={examState.symptomSite}
-              onChangeSymptomSite={(symptomSite) => setExamState({ ...examState, symptomSite })}
-            />
 
             {/* Collapsible Clinical Details Sections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

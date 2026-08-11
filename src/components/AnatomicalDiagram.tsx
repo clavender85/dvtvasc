@@ -1322,9 +1322,9 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       )}
 
       {/* Main Interactive Map & Permanent Compact Legend Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start flex-1 min-h-[680px]">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch flex-1">
         {/* SVG Canvas Container (3 cols on lg screens) */}
-        <div className="lg:col-span-3 relative h-full min-h-[680px] bg-slate-950/90 rounded-xl border border-slate-800 p-2 flex justify-center items-center overflow-auto shadow-inner">
+        <div className="lg:col-span-3 relative bg-slate-950/90 rounded-xl border border-slate-800 p-2 flex justify-center items-center shadow-inner">
           {/* Anatomical Direction Indicators */}
           <div className="absolute top-3 left-4 flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             <ArrowUp className="w-3.5 h-3.5 text-teal-400" /> PROXIMAL (PROX)
@@ -1343,12 +1343,12 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
           {/* SVG Map Canvas */}
           <div
-            className="w-full h-full flex justify-center transition-transform duration-200"
+            className="w-full flex justify-center transition-transform duration-200"
             style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
           >
             <svg
               viewBox="0 0 900 1020"
-              className="w-full h-full max-h-[950px]"
+              className="w-full h-auto"
               preserveAspectRatio="xMidYMid meet"
             >
               <defs>
@@ -1947,7 +1947,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       </div>
 
       {/* Permanent Compact Legend Sidebar (1 col on lg screens) */}
-      <div className="lg:col-span-1 bg-slate-950/95 border border-slate-800 rounded-xl p-3 text-xs space-y-2 font-sans self-stretch overflow-y-auto max-h-[750px] shadow-xl">
+      <div className="lg:col-span-1 bg-slate-950/95 border border-slate-800 rounded-xl p-2.5 text-xs space-y-1.5 font-sans shadow-xl flex flex-col justify-start">
         <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800">
           <Info className="w-4 h-4 text-teal-400 flex-shrink-0" />
           <div>

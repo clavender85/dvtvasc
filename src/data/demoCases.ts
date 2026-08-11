@@ -52,6 +52,13 @@ const baseExamState: ExamState = {
   },
   otherFindings: [],
   comparisons: [],
+  symptomSite: {
+    side: 'Not specified',
+    regions: [],
+    focalAreaAssessed: false,
+    focalFinding: 'No focal abnormality',
+    comments: ''
+  },
   generatedSummary: '',
   userSummaryEdited: false,
   sonographerSignOff: false

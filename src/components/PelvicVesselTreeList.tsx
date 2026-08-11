@@ -81,7 +81,7 @@ export const PelvicVesselTreeList: React.FC<PelvicVesselTreeListProps> = ({
       />
 
       {/* Category Groups Container */}
-      <div className="p-2 space-y-3 overflow-y-auto flex-1 max-h-[700px] text-xs">
+      <div className="p-2 space-y-3 flex-1 text-xs">
         {PELVIC_GROUPS.map((group) => (
           <div key={group.groupKey} className="bg-slate-950/70 border border-slate-800/80 rounded-lg overflow-hidden">
             {/* Category Subheader */}

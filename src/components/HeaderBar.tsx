@@ -1,15 +1,18 @@
 // Examination Header & Quick Toolbar Component
 
 import React from 'react';
-import { PatientHeader, ExamType, ValidationAlert, StudyType } from '../types/dvt';
+import { PatientHeader, ExamType, ValidationAlert, StudyType, SymptomSiteAssessment } from '../types/dvt';
 import { CLINICAL_INDICATIONS } from '../data/anatomyData';
 import { DEMO_CASES } from '../data/demoCases';
 import { getNormalizedScope, updateHeaderScope } from '../utils/scopeUtils';
+import { SymptomSiteSection } from './SymptomSiteSection';
 import { CheckCircle2, AlertTriangle, Printer, Copy, Save, RotateCcw, ShieldCheck, FileText, CheckSquare, Square } from 'lucide-react';
 
 interface HeaderBarProps {
   header: PatientHeader;
   onChangeHeader: (newHeader: PatientHeader) => void;
+  symptomSite?: SymptomSiteAssessment;
+  onChangeSymptomSite?: (symptomSite: SymptomSiteAssessment) => void;
   onSelectDemoCase: (demoId: string) => void;
   onMarkAssessedNormal: () => void;
   onSaveDraft: () => void;
@@ -28,6 +31,8 @@ interface HeaderBarProps {
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   header,
   onChangeHeader,
+  symptomSite,
+  onChangeSymptomSite,
   onSelectDemoCase,
   onMarkAssessedNormal,
   onSaveDraft,
@@ -233,7 +238,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       </div>
 
       {/* Patient & Examination Header Form */}
-      <div className="px-4 py-3 bg-slate-900/90 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <div className="px-4 py-3 bg-slate-900/90 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
         {/* Patient Identifiers */}
         <div className="space-y-1.5">
           <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -388,13 +393,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Clinical Indications Pills */}
-        <div className="space-y-1 md:col-span-2">
+      {/* Two-Column Clinical Section: Indications (Left) & Symptoms/Site (Right) */}
+      <div className="px-4 py-3 bg-slate-900 border-t border-slate-800/80 grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+        {/* Left Column: Clinical Indications & Clinical History Notes (~60-65% width) */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-2">
           <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             Clinical Indications (Select All Applicable)
           </label>
-          <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1 py-0.5">
+          <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1 py-0.5">
             {CLINICAL_INDICATIONS.map((ind) => {
               const isSelected = (header.indications || []).includes(ind);
               return (
@@ -413,13 +421,28 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               );
             })}
           </div>
-          <input
-            type="text"
-            placeholder="Clinical History / Notes..."
-            value={header.clinicalHistory}
-            onChange={(e) => onChangeHeader({ ...header, clinicalHistory: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 text-xs focus:border-teal-500 focus:outline-none mt-1"
-          />
+          <div className="pt-1">
+            <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+              Clinical history / indication free text:
+            </label>
+            <input
+              type="text"
+              placeholder="Clinical History / Notes..."
+              value={header.clinicalHistory}
+              onChange={(e) => onChangeHeader({ ...header, clinicalHistory: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 text-xs focus:border-teal-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Right Column: Symptoms / Site Panel (~35-40% width) */}
+        <div className="lg:col-span-5 xl:col-span-4">
+          {onChangeSymptomSite && (
+            <SymptomSiteSection
+              symptomSite={symptomSite}
+              onChangeSymptomSite={onChangeSymptomSite}
+            />
+          )}
         </div>
       </div>
     </header>
