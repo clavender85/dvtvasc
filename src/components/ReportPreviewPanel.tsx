@@ -4,7 +4,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ExamState, InteractiveSentence, VesselFinding } from '../types/dvt';
-import { generateConcisePreviewData } from '../utils/reportGenerator';
+import { generateConcisePreviewData, formatOtherFindingDimensions } from '../utils/reportGenerator';
 import {
   FileText,
   MousePointer,
@@ -119,8 +119,21 @@ export const ReportPreviewPanel: React.FC<ReportPreviewPanelProps> = ({
       }
     });
 
+    // Check 4: Other findings dimension mismatch in manually edited report
+    if (isReportManuallyEdited && state.otherFindings) {
+      state.otherFindings.forEach((of) => {
+        const dimStr = formatOtherFindingDimensions(of);
+        if (dimStr && state.summaryText && !state.summaryText.includes(dimStr)) {
+          list.push({
+            id: `dim-mismatch-${of.id}`,
+            message: `Reported dimensions differ from worksheet measurements for ${of.side} ${of.type} (${dimStr}).`
+          });
+        }
+      });
+    }
+
     return list;
-  }, [state.vesselFindings, state.summaryText]);
+  }, [state.vesselFindings, state.otherFindings, state.summaryText, isReportManuallyEdited]);
 
   // Combined active selections
   const activeSelectedIds = useMemo(() => {

@@ -10,7 +10,8 @@ import {
   NON_VISUALIZATION_REASON_LABELS,
   ReportBlock,
   InteractiveSentence,
-  ConcisePreviewData
+  ConcisePreviewData,
+  OtherFindingItem
 } from '../types/dvt';
 import { ANATOMICAL_VESSELS, LANDMARK_LABELS } from '../data/anatomyData';
 import { generateIntervalComparisonSummary, generateKeyComparisonFinding } from './comparisonEngine';
@@ -34,6 +35,62 @@ function formatExtent(f: VesselFinding): string {
   }
 
   return str ? `extending from ${str}` : '';
+}
+
+export function formatOtherFindingDimensions(item: OtherFindingItem): string {
+  if (item.dimensionsText && item.dimensionsText.trim().length > 0) {
+    return item.dimensionsText.trim();
+  }
+  const dims: (number | string)[] = [];
+  if (item.dimensionsLengthMm !== undefined && item.dimensionsLengthMm !== null && !isNaN(item.dimensionsLengthMm)) {
+    dims.push(item.dimensionsLengthMm);
+  }
+  if (item.dimensionsWidthMm !== undefined && item.dimensionsWidthMm !== null && !isNaN(item.dimensionsWidthMm)) {
+    dims.push(item.dimensionsWidthMm);
+  }
+  if (item.dimensionsDepthMm !== undefined && item.dimensionsDepthMm !== null && !isNaN(item.dimensionsDepthMm)) {
+    dims.push(item.dimensionsDepthMm);
+  }
+  if (dims.length === 0) return '';
+  return `${dims.join(' × ')} mm`;
+}
+
+export function formatOtherFindingText(item: OtherFindingItem): string {
+  const dimStr = formatOtherFindingDimensions(item);
+  const measuringText = dimStr ? ` measuring ${dimStr}` : '';
+
+  const sideText = item.side && item.side !== 'Bilateral' && item.side !== 'Pelvis'
+    ? item.side.toLowerCase()
+    : item.side === 'Bilateral' ? 'bilateral' : '';
+
+  let locationText = item.location ? item.location.trim() : '';
+
+  let formattedSideInMain = sideText;
+  if (locationText && sideText && locationText.toLowerCase().includes(sideText)) {
+    formattedSideInMain = '';
+  }
+
+  let locationPhrase = '';
+  if (locationText) {
+    if (/^(in|at|within)\s/i.test(locationText)) {
+      locationPhrase = ` ${locationText}`;
+    } else {
+      locationPhrase = ` in the ${locationText}`;
+    }
+  }
+
+  const findingTitle = item.type;
+  
+  let text = `A ${formattedSideInMain ? formattedSideInMain + ' ' : ''}${findingTitle}${measuringText} is demonstrated${locationPhrase}.`;
+  text = text.replace(/\s+/g, ' ').replace(' .', '.');
+
+  if (item.comments && item.comments.trim().length > 0) {
+    const cleanComments = item.comments.trim();
+    const finalComments = cleanComments.endsWith('.') ? cleanComments : `${cleanComments}.`;
+    text = `${text} ${finalComments}`;
+  }
+
+  return text;
 }
 
 function formatChronicity(c?: SonographicChronicity): string {
@@ -516,13 +573,7 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
   if (otherFindings.length > 0) {
     const othLines = ['=== OTHER / NON-VENOUS FINDINGS ==='];
     otherFindings.forEach((of) => {
-      let dimText = '';
-      if (of.dimensionsLengthMm || of.dimensionsWidthMm || of.dimensionsDepthMm) {
-        dimText = ` Dimensions: ${of.dimensionsLengthMm ?? '-'} x ${of.dimensionsWidthMm ?? '-'} x ${of.dimensionsDepthMm ?? '-'} mm.`;
-      } else if (of.dimensionsText) {
-        dimText = ` Dimensions: ${of.dimensionsText}.`;
-      }
-      othLines.push(`• ${of.side} ${of.type}: Located at ${of.location}.${dimText} ${of.comments}`);
+      othLines.push(`• ${formatOtherFindingText(of)}`);
     });
 
     blocks.push({
@@ -530,6 +581,7 @@ export function generateStructuredReportBlocks(state: ExamState): ReportBlock[] 
       section: 'OTHER FINDINGS',
       text: othLines.join('\n'),
       sourceType: 'other_finding',
+      sourceVesselIds: otherFindings.map((f) => f.id),
       region: 'global',
       category: 'other'
     });
@@ -814,14 +866,11 @@ export function generateConcisePreviewData(state: ExamState): ConcisePreviewData
 
   // --- 4. OTHER FINDINGS CONCISE SENTENCE ---
   if (otherFindings && otherFindings.length > 0) {
-    otherFindings.forEach((of, idx) => {
-      let othMsg = `A ${of.type.toLowerCase()} is noted in the ${of.side} ${of.location}`;
-      if (of.dimensionsText) othMsg += ` (${of.dimensionsText})`;
-      othMsg += '.';
+    otherFindings.forEach((of) => {
       sentences.push({
-        id: `sent-other-${idx}`,
-        text: othMsg,
-        sourceVesselIds: ['global'],
+        id: `sent-other-${of.id}`,
+        text: formatOtherFindingText(of),
+        sourceVesselIds: [of.id],
         region: 'global',
         category: 'other'
       });
@@ -869,6 +918,14 @@ export function generateConcisePreviewData(state: ExamState): ConcisePreviewData
   } else {
     keyImpression = `No DVT identified in the assessed ${sideText} deep veins.`;
     impressionVesselIds = [];
+  }
+
+  if (otherFindings && otherFindings.length > 0) {
+    const ofSummaries = otherFindings.map((of) => {
+      const dimStr = formatOtherFindingDimensions(of);
+      return `${of.side} ${of.type}${dimStr ? ' measuring ' + dimStr : ''}`;
+    }).join('; ');
+    keyImpression += ` Incidental non-venous finding: ${ofSummaries}.`;
   }
 
   return {
