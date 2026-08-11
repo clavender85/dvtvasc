@@ -79,7 +79,7 @@ const LegendSwatch: React.FC<{
   fillPatternUrl?: string;
   fillColor?: string;
   wallDashArray?: string;
-  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'synechiae_strands' | 'none_faint';
+  lumenType: 'full_flow' | 'none' | 'narrow_channel' | 'wide_residual' | 'recanalised_multi' | 'synechiae_strands' | 'none_faint' | 'chronic_wall';
   lumenColor?: string;
   showQuestionMark?: boolean;
 }> = ({
@@ -115,7 +115,7 @@ const LegendSwatch: React.FC<{
             x2="46"
             y2="10"
             stroke={fillPatternUrl || fillColor}
-            strokeWidth="9"
+            strokeWidth={lumenType === 'chronic_wall' ? '3' : '9'}
             strokeLinecap="round"
           />
         )}
@@ -129,6 +129,9 @@ const LegendSwatch: React.FC<{
         {lumenType === 'wide_residual' && (
           <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="5" strokeLinecap="round" />
         )}
+        {lumenType === 'chronic_wall' && (
+          <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="6.5" strokeLinecap="round" />
+        )}
         {lumenType === 'recanalised_multi' && (
           <>
             <line x1="5" y1="7" x2="45" y2="7" stroke={lumenColor} strokeWidth="1.8" strokeLinecap="round" />
@@ -137,8 +140,8 @@ const LegendSwatch: React.FC<{
         )}
         {lumenType === 'synechiae_strands' && (
           <>
-            <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="5" strokeLinecap="round" />
-            <line x1="5" y1="10" x2="45" y2="10" stroke="#f59e0b" strokeWidth="1.8" strokeDasharray="2 3" strokeLinecap="round" />
+            <line x1="5" y1="10" x2="45" y2="10" stroke={lumenColor} strokeWidth="5.5" strokeLinecap="round" />
+            <line x1="5" y1="10" x2="45" y2="10" stroke="#d97706" strokeWidth="1.5" strokeDasharray="2 3" strokeLinecap="round" />
           </>
         )}
         {showQuestionMark && (
@@ -489,7 +492,7 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
       const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'Technical Limitation';
       const customNote = finding.customNonVisualizationReason ? `: ${finding.customNonVisualizationReason}` : '';
       return {
-        wallColor: '#f59e0b',
+        wallColor: '#94a3b8',
         wallDashArray: '2 3',
         wallWidth: calculatedWidth * 0.85,
         fillColor: 'transparent',
@@ -1958,80 +1961,55 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
 
         <div className="space-y-1.5">
           <LegendSwatch
-            title="Normal Patent Vein"
-            subtitle="Green/teal, thin solid vessel, clear flow"
+            title="Normal / Patent"
+            subtitle="Clear lumen with normal flow"
             wallColor="#059669"
             fillColor="#059669"
             lumenType="full_flow"
             lumenColor="#34d399"
           />
           <LegendSwatch
-            title="Occlusive DVT"
-            subtitle="Thick solid amber, 100% occluded (no lumen)"
+            title="Occlusive thrombus"
+            subtitle="Solid amber occluded lumen"
             wallColor="#d97706"
             fillColor="#d97706"
             lumenType="none"
           />
           <LegendSwatch
-            title="Mostly Occlusive DVT"
-            subtitle="Amber vessel, narrow central flow channel"
-            wallColor="#d97706"
-            fillColor="#b45309"
-            lumenType="narrow_channel"
-            lumenColor="#22d3ee"
-          />
-          <LegendSwatch
-            title="Partially / Non-Occlusive DVT"
-            subtitle="Amber mural fill & wide patent lumen"
+            title="Non-occlusive thrombus"
+            subtitle="Partial mural thrombus with residual lumen"
             wallColor="#d97706"
             fillPatternUrl="url(#hatch-amber)"
             lumenType="wide_residual"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Recanalised Thrombus"
-            subtitle="Amber vessel, multiple flow channel lines"
-            wallColor="#d97706"
-            fillPatternUrl="url(#recanalised-amber)"
-            lumenType="recanalised_multi"
-            lumenColor="#22d3ee"
-          />
-          <LegendSwatch
-            title="Chronic Post-Thrombotic"
-            subtitle="Amber vessel, dashed border, light hatch"
+            title="Chronic post-thrombotic"
+            subtitle="Residual wall thickening & chronic hatch pattern"
             wallColor="#d97706"
             wallDashArray="6 3"
             fillPatternUrl="url(#hatch-amber-light)"
-            lumenType="wide_residual"
+            lumenType="chronic_wall"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Synechiae / Webs / Strands"
-            subtitle="Patent lumen with dotted intraluminal strands"
+            title="Synechiae / webs / strands"
+            subtitle="Patent lumen with intraluminal strands"
             wallColor="#d97706"
             fillPatternUrl="url(#hatch-amber)"
             lumenType="synechiae_strands"
             lumenColor="#22d3ee"
           />
           <LegendSwatch
-            title="Superficial Thrombosis"
-            subtitle="Amber superficial vessel with distinct border"
-            wallColor="#d97706"
-            wallDashArray="8 2"
-            fillPatternUrl="url(#hatch-amber)"
-            lumenType="wide_residual"
-            lumenColor="#22d3ee"
-          />
-          <LegendSwatch
-            title="Not Visualised (NV)"
-            subtitle="Amber dotted vessel with reason (e.g. Body Habitus, Edema, Gas)"
-            wallColor="#f59e0b"
+            title="Not visualised (NV)"
+            subtitle="Grey dotted vessel outline (unseen)"
+            wallColor="#94a3b8"
             wallDashArray="2 3"
             lumenType="none_faint"
           />
           <LegendSwatch
-            title="Not Examined (NA)"
-            subtitle="Faint neutral outline (Out of study protocol scope)"
+            title="Not examined (NA)"
+            subtitle="Faint neutral outline (out of scope)"
             wallColor="#334155"
             wallDashArray="5 4"
             lumenType="none_faint"
@@ -2051,11 +2029,11 @@ export const AnatomicalDiagram: React.FC<AnatomicalDiagramProps> = ({
               <span
                 className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
                   hoveredFinding.status === 'abnormal'
-                    ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                    ? 'bg-amber-950 text-amber-300 border border-amber-800'
                     : hoveredFinding.status === 'normal'
                     ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                     : hoveredFinding.status === 'not_visualised'
-                    ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                    ? 'bg-slate-900 text-slate-300 border border-slate-700'
                     : 'bg-slate-800 text-slate-400'
                 }`}
               >

@@ -144,8 +144,8 @@ export const IliocavalDiagram: React.FC<IliocavalDiagramProps> = ({
       const reasonKey = finding.nonVisualizationReason || 'body_habitus';
       const reasonLabel = NON_VISUALIZATION_REASON_LABELS[reasonKey] || 'Technical Limitation';
       return {
-        wallColor: '#f59e0b',
-        wallDashArray: '3 3',
+        wallColor: '#94a3b8',
+        wallDashArray: '2 3',
         wallWidth: calculatedWidth * 0.85,
         fillColor: 'transparent',
         lumenColor: 'transparent',
